@@ -1,7 +1,7 @@
 defmodule W3Events.Util do
   def to_hex(binary), do: "0x" <> Base.encode16(binary, case: :lower)
 
-  def from_hex("0x" <> hex), do: Base.decode16!(hex, case: :lower)
+  def from_hex("0x" <> hex), do: from_hex(hex)
   def from_hex(hex), do: Base.decode16!(hex, case: :lower)
 
   def integer_from_hex("0x" <> hex) do

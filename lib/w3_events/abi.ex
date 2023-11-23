@@ -52,7 +52,11 @@ defmodule W3Events.ABI do
   @spec decode_event(binary(), ABI.specification(), [binary()]) ::
           {:ok, ABI.selector(), map()} | {:error, any()}
   def decode_event(data, abi, topics) do
-    topics = decode_topics(topics, abi)
+    topics =
+      Enum.map(topics, fn
+        nil -> nil
+        topic -> W3Events.Util.from_hex(topic)
+      end)
 
     case ABI.Event.find_and_decode(
            abi,
@@ -67,15 +71,13 @@ defmodule W3Events.ABI do
     end
   end
 
-  # TODO: if the topic does not start with 0x, it's the name of an event
-  # so we should convert this to a hex topic
-  def decode_topics(topics, abi) do
+  def encode_topics(topics, abi) do
     Enum.map(topics, fn
       nil ->
         nil
 
       "0x" <> _rest = topic ->
-        W3Events.Util.from_hex(topic)
+        topic
 
       topic ->
         selector =

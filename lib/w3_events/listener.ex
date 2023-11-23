@@ -29,7 +29,7 @@ defmodule W3Events.Listener do
           nil
       end
 
-    topics = W3Events.ABI.decode_topics(config[:topics] || [], abi)
+    topics = W3Events.ABI.encode_topics(config[:topics] || [], abi)
 
     config =
       Map.merge(config, %{

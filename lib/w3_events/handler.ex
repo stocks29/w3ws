@@ -8,6 +8,8 @@ defmodule W3Events.Handler do
     quote do
       @behaviour W3Events.Handler.HandlerBehaviour
 
+      require Logger
+
       alias W3Events.{Env, Event, RawEvent}
 
       def handle(%Env{} = env) do
@@ -15,7 +17,7 @@ defmodule W3Events.Handler do
       end
 
       def handle_event(%Env{} = env) do
-        IO.inspect(env)
+        Logger.info("Received event: #{inspect(env)}")
       end
 
       defoverridable handle_event: 1

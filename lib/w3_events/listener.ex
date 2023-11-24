@@ -57,7 +57,36 @@ defmodule W3Events.Listener do
       {id, put_in(state, [:listener, :block_ping_id], id)}
     end
 
-    defp default_listener_state(id), do: %{id: id, block_ping_id: nil}
+    defp default_listener_state(id), do: %{id: id, block_ping_id: nil, pending: %{}}
+
+    @doc """
+    Add a pending request
+    """
+    def add_pending(state, pending = %{id: id}) do
+      state
+      |> set_id(id)
+      |> update_in([:listener, :pending], &Map.put(&1, id, pending))
+    end
+
+    @doc """
+    Call when a response is received to remove a pending request
+    """
+    def remove_pending(state, id) do
+      update_in(state, [:listener, :pending], &Map.delete(&1, id))
+    end
+
+    # subscriptions in the state are not currently updated during the callback. that a prob?
+    def update_subscriptions(state, :state, fun) do
+      {subscriptions, state} =
+        state
+        |> get_subscriptions()
+        |> Enum.reduce({[], state}, fn subscription, {subscriptions, state} ->
+          {subscription, state} = fun.({subscription, state})
+          {[subscription | subscriptions], state}
+        end)
+
+      set_subscriptions(state, subscriptions)
+    end
 
     def update_subscriptions(state, fun) do
       subscriptions =
@@ -122,19 +151,20 @@ defmodule W3Events.Listener do
 
     ids = Stream.iterate(next_id, &(&1 + 1))
 
-    subscriptions =
-      Enum.zip_reduce(subscriptions, ids, [], fn subscription, id, subscriptions ->
-        address = subscription[:address]
-        topics = subscription[:topics]
+    {state, subscriptions} =
+      Enum.zip_reduce(subscriptions, ids, {state, []}, fn
+        subscription, id, {state, subscriptions} ->
+          address = subscription[:address]
+          topics = subscription[:topics]
 
-        topics
-        |> Message.eth_subscribe_logs(id: id, address: address)
-        |> Message.encode!()
-        |> send_text_frame(state)
+          state =
+            topics
+            |> Message.eth_subscribe_logs(id: id, address: address)
+            |> send_pending(state)
 
-        subscription = Map.put(subscription, :message_id, id)
+          subscription = Subscription.set_message_id(subscription, id)
 
-        [subscription | subscriptions]
+          {state, [subscription | subscriptions]}
       end)
 
     if length(subscriptions) == 1 do
@@ -144,26 +174,26 @@ defmodule W3Events.Listener do
       Logger.metadata(uri: uri)
     end
 
-    max_id =
-      subscriptions
-      |> Enum.map(fn %{message_id: id} -> id end)
-      |> Enum.max(&>=/2, fn -> 0 end)
-
     state
     |> State.set_subscriptions(subscriptions)
-    |> State.set_id(max_id)
     |> maybe_schedule_helpers()
   end
 
   defp unsubscribe_subscriptions(state) do
-    State.update_subscriptions(state, fn subscription = %{subscription_id: sub_id} ->
-      Message.eth_unsubscribe(sub_id)
-      |> Message.encode!()
-      |> send_text_frame(state)
+    State.update_subscriptions(state, :state, fn
+      {subscription = %{subscription_id: sub_id}, state} ->
+        {id, state} = State.next_id(state)
 
-      subscription
-      |> Subscription.set_subscription_id(nil)
-      |> Subscription.set_message_id(nil)
+        state =
+          sub_id
+          |> Message.eth_unsubscribe(id: id)
+          |> send_pending(state)
+
+        subscription
+        |> Subscription.set_subscription_id(nil)
+        |> Subscription.set_message_id(nil)
+
+        {subscription, state}
     end)
   end
 
@@ -194,8 +224,7 @@ defmodule W3Events.Listener do
     {id, state} = State.next_block_ping_id(state)
 
     Message.eth_block_number(id: id)
-    |> Message.encode!()
-    |> send_text_frame(state)
+    |> send_pending(state)
 
     {:noreply, maybe_schedule_block_ping(state)}
   end
@@ -246,15 +275,37 @@ defmodule W3Events.Listener do
       "[BlockPing] current block: #{W3Events.Util.integer_from_hex(result)} (#{result})"
     )
 
+    State.remove_pending(state, id)
+  end
+
+  defp handle_decoded_frame(
+         %{"id" => id} = message,
+         state = %{listener: %{pending: pending}}
+       )
+       when is_map_key(pending, id) do
+    request = pending[id]
+
+    Logger.debug("Received response\n#{inspect(request)}\n#{inspect(message)}")
+
+    request
+    |> handle_pending_response(message, state)
+    |> State.remove_pending(id)
+  end
+
+  defp handle_decoded_frame(message, state) do
+    Logger.warning("unhandled message: #{inspect(message)}")
+
     state
   end
 
-  defp handle_decoded_frame(%{"id" => _id, "result" => result}, state) when is_boolean(result) do
-    Logger.debug("Destroyed subscription: #{result}")
-    state
-  end
+  # a little weird because the request is an atom map and the response is a string map
 
-  defp handle_decoded_frame(%{"id" => id, "result" => sub_id}, state) do
+  # handle eth_subscribe response
+  defp handle_pending_response(
+         %{method: :eth_subscribe},
+         %{"id" => id, "result" => sub_id},
+         state
+       ) do
     Logger.debug("Created subscription: #{sub_id}")
 
     State.update_subscriptions(state, fn subscription ->
@@ -265,9 +316,22 @@ defmodule W3Events.Listener do
     end)
   end
 
-  defp handle_decoded_frame(message, state) do
-    Logger.warning("unhandled message: #{inspect(message)}")
+  # handle eth_unsubscribe response
+  defp handle_pending_response(
+         %{method: :eth_unsubscribe, params: [sub_id]},
+         %{"result" => true},
+         state
+       ) do
+    Logger.debug("Destroyed subscription: #{sub_id}")
+    state
+  end
 
+  defp handle_pending_response(
+         %{method: :eth_unsubscribe, params: [sub_id]},
+         %{"result" => false},
+         state
+       ) do
+    Logger.warning("Failed to destory subscription: #{sub_id}")
     state
   end
 
@@ -298,5 +362,19 @@ defmodule W3Events.Listener do
     W3Events.Env.with_event(env, W3Events.Event.from_raw_event(env.raw, selector, decoded_data))
   end
 
-  defp send_text_frame(text, state), do: send_frame({:text, text}, state)
+  defp send_text_frame(text, state) do
+    case send_frame({:text, text}, state) do
+      {:noreply, state} -> state
+    end
+  end
+
+  # accepts an uncoded message
+  defp send_pending(message = %{id: _id}, state) do
+    Logger.debug("Sending request\n #{inspect(message)}")
+    state = State.add_pending(state, message)
+
+    message
+    |> Message.encode!()
+    |> send_text_frame(state)
+  end
 end

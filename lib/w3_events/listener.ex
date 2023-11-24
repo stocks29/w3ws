@@ -133,20 +133,22 @@ defmodule W3Events.Listener do
   defp apply_handler(env, fun) when is_function(fun),
     do: Process.spawn(fn -> fun.(env) end, [])
 
-  defp maybe_decode_event(env, %{abi: nil}), do: env
+  defp maybe_decode_event(env, %{abi: nil}) do
+    W3Events.Env.with_event(env, W3Events.Event.from_raw_event(env.raw, nil, nil))
+  end
 
   defp maybe_decode_event(env, %{abi: abi}) do
-    case W3Events.ABI.decode_event(env.raw.data, abi, env.raw.topics) do
-      {:ok, selector, decoded_data} ->
-        W3Events.Env.with_event(
-          env,
-          W3Events.Event.from_raw_event(env.raw, selector, decoded_data)
-        )
+    {selector, decoded_data} =
+      case W3Events.ABI.decode_event(env.raw.data, abi, env.raw.topics) do
+        {:ok, selector, decoded_data} ->
+          {selector, decoded_data}
 
-      {:error, _} = err ->
-        Logger.warning("unable to decode event error=#{inspect(err)} event=#{inspect(env.raw)}")
-        env
-    end
+        {:error, _} = err ->
+          Logger.warning("unable to decode event error=#{inspect(err)} event=#{inspect(env.raw)}")
+          {nil, nil}
+      end
+
+    W3Events.Env.with_event(env, W3Events.Event.from_raw_event(env.raw, selector, decoded_data))
   end
 
   defp send_text_frame(text, state), do: send_frame({:text, text}, state)

@@ -23,6 +23,6 @@ defmodule W3Events.Env do
   end
 
   def with_event(%__MODULE__{} = env, %W3Events.Event{} = event) do
-    %{env | decoded?: true, event: event}
+    %{env | decoded?: event.data != nil, event: event}
   end
 end

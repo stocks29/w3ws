@@ -8,34 +8,30 @@ defmodule W3Events.Listener do
   def start_link(config) do
     uri = URI.new!(config.uri)
 
-    config =
-      config
-      |> Map.put_new(:handler, W3Events.Handler.DefaultHandler)
+    # default to one subscription which listens to everything
+    subscriptions =
+      (config[:subscriptions] || [%{}])
+      |> Enum.map(fn subscription ->
+        abi =
+          cond do
+            subscription[:abi_files] ->
+              ABI.from_files(subscription[:abi_files])
 
-    if (is_nil(config[:topics]) or length(config[:topics]) < 1) and
-         (not is_nil(config[:abi]) or not is_nil(config[:abi_file])) do
-      raise "Must specify at least one topic to decode events"
-    end
+            subscription[:abi] ->
+              ABI.from_abi(subscription[:abi])
 
-    abi =
-      cond do
-        config[:abi_file] ->
-          ABI.from_file(config[:abi_file])
+            true ->
+              nil
+          end
 
-        config[:abi] ->
-          ABI.from_abi(config[:abi])
+        topics = W3Events.ABI.encode_topics(subscription[:topics] || [], abi)
 
-        true ->
-          nil
-      end
+        subscription
+        |> Map.merge(%{abi: abi, topics: topics})
+        |> Map.put_new(:handler, W3Events.Handler.DefaultHandler)
+      end)
 
-    topics = W3Events.ABI.encode_topics(config[:topics] || [], abi)
-
-    config =
-      Map.merge(config, %{
-        abi: abi,
-        topics: topics
-      })
+    config = Map.put(config, :subscriptions, subscriptions)
 
     Wind.Client.start_link(__MODULE__, uri: uri, config: config)
   end
@@ -43,57 +39,104 @@ defmodule W3Events.Listener do
   @impl Wind.Client
   def handle_connect(state) do
     config = Keyword.get(state.opts, :config)
-    address = config[:address]
-    topics = config[:topics]
+    subscriptions = config[:subscriptions]
     uri = config[:uri]
 
-    Logger.metadata(address: address, topics: topics, uri: uri)
+    ids = Stream.iterate(1, &(&1 + 1))
 
-    message =
-      topics
-      |> Message.eth_subscribe_logs(id: 1, address: address)
-      |> Message.encode!()
+    subscriptions =
+      Enum.zip_reduce(subscriptions, ids, [], fn subscription, id, subscriptions ->
+        address = subscription[:address]
+        topics = subscription[:topics]
 
-    {:reply, {:text, message}, state}
-  end
+        topics
+        |> Message.eth_subscribe_logs(id: id, address: address)
+        |> Message.encode!()
+        |> send_text_frame(state)
 
-  @impl Wind.Client
-  def handle_frame({:text, message}, state) do
-    message
-    |> Jason.decode!()
-    |> handle_decoded_frame(state.opts[:config])
+        subscription = Map.put(subscription, :message_id, id)
+
+        [subscription | subscriptions]
+      end)
+
+    if length(subscriptions) == 1 do
+      [subscription] = subscriptions
+      Logger.metadata(uri: uri, address: subscription[:address], topics: subscription[:topics])
+    else
+      Logger.metadata(uri: uri)
+    end
+
+    max_id =
+      subscriptions
+      |> Enum.map(fn %{message_id: id} -> id end)
+      |> Enum.max(&>=/2, fn -> 0 end)
+
+    state =
+      state
+      |> put_in([:opts, :config, :subscriptions], subscriptions)
+      |> Map.put(:listener, %{id: max_id})
 
     {:noreply, state}
   end
 
-  defp handle_decoded_frame(message = %{"method" => "eth_subscription"}, config) do
+  @impl Wind.Client
+  def handle_frame({:text, message}, state) do
+    state =
+      message
+      |> Jason.decode!()
+      |> handle_decoded_frame(state)
+
+    {:noreply, state}
+  end
+
+  defp handle_decoded_frame(
+         message = %{"method" => "eth_subscription", "params" => %{"subscription" => sub_id}},
+         state
+       ) do
+    config = state.opts[:config]
+    subscription = Enum.find(config[:subscriptions], &(&1[:subscription_id] == sub_id))
+
     message
     |> W3Events.Env.from_eth_subscription()
-    |> maybe_decode_event(config)
-    |> apply_handler(config)
+    |> maybe_decode_event(subscription)
+    |> apply_handler(subscription.handler)
+
+    state
   end
 
-  defp handle_decoded_frame(%{"id" => 1, "result" => subscription}, _config) do
-    Logger.debug("subscription created: #{subscription}")
+  defp handle_decoded_frame(%{"id" => id, "result" => sub_id}, state) do
+    Logger.debug("subscription created: #{sub_id}")
+
+    subscriptions =
+      Enum.map(state.opts[:config][:subscriptions], fn subscription ->
+        case subscription[:message_id] do
+          ^id -> Map.put(subscription, :subscription_id, sub_id)
+          _ -> subscription
+        end
+      end)
+
+    put_in(state, [:opts, :config, :subscriptions], subscriptions)
   end
 
-  defp handle_decoded_frame(message, _config) do
+  defp handle_decoded_frame(message, state) do
     Logger.warning("unhandled message: #{inspect(message)}")
+
+    state
   end
 
   # we spawn processes (and don't link) so handler errors do not take down the listener process
-  defp apply_handler(env, %{handler: {m, f, a}}), do: Process.spawn(m, f, [env | a], [])
+  defp apply_handler(env, {m, f, a}), do: Process.spawn(m, f, [env | a], [])
 
-  defp apply_handler(env, %{handler: handler}) when is_atom(handler),
+  defp apply_handler(env, handler) when is_atom(handler),
     do: Process.spawn(handler, :handle, [env], [])
 
-  defp apply_handler(env, %{handler: fun}) when is_function(fun),
+  defp apply_handler(env, fun) when is_function(fun),
     do: Process.spawn(fn -> fun.(env) end, [])
 
   defp maybe_decode_event(env, %{abi: nil}), do: env
 
-  defp maybe_decode_event(env, %{abi: abi, topics: topics}) do
-    case W3Events.ABI.decode_event(env.raw.data, abi, topics) do
+  defp maybe_decode_event(env, %{abi: abi}) do
+    case W3Events.ABI.decode_event(env.raw.data, abi, env.raw.topics) do
       {:ok, selector, decoded_data} ->
         W3Events.Env.with_event(
           env,
@@ -101,8 +144,10 @@ defmodule W3Events.Listener do
         )
 
       {:error, _} = err ->
-        Logger.warning("failed to decode event: #{inspect(err)}")
+        Logger.warning("unable to decode event error=#{inspect(err)} event=#{inspect(env.raw)}")
         env
     end
   end
+
+  defp send_text_frame(text, state), do: send_frame({:text, text}, state)
 end

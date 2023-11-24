@@ -1,14 +1,22 @@
 defmodule W3Events.ABI do
-  def from_file(path) do
-    path
-    |> File.read!()
-    |> Jason.decode!()
-    |> ABI.parse_specification(include_events?: true)
+  def from_files(paths) do
+    Enum.flat_map(paths, fn path ->
+      path
+      |> File.read!()
+      |> Jason.decode!()
+      |> ABI.parse_specification(include_events?: true)
+      |> filter_abi_events()
+    end)
   end
 
   def from_abi(abi) do
     abi
     |> ABI.parse_specification(include_events?: true)
+    |> filter_abi_events()
+  end
+
+  defp filter_abi_events(abi) do
+    Enum.filter(abi, fn %ABI.FunctionSelector{type: type} -> type == :event end)
   end
 
   @doc """
@@ -72,31 +80,38 @@ defmodule W3Events.ABI do
   end
 
   def encode_topics(topics, abi) do
-    Enum.map(topics, fn
-      nil ->
-        nil
+    Enum.map(topics, &encode_topic(&1, abi))
+  end
 
-      "0x" <> _rest = topic ->
+  defp encode_topic(nil = topic, _abi), do: topic
+
+  defp encode_topic("0x" <> _rest = topic, _abi), do: topic
+
+  defp encode_topic(topic, nil) when is_binary(topic) do
+    raise "Unable to encode topic #{inspect(topic)} as no ABI was provided"
+  end
+
+  defp encode_topic(topic, abi) when is_binary(topic) do
+    selector =
+      if String.contains?(topic, "(") do
+        # this is an event signature, so convert it to a FunctionSelector
         topic
+        |> ABI.FunctionSelector.decode()
+      else
+        # must be an event name, so find the selector
+        Enum.find(abi, fn
+          %ABI.FunctionSelector{type: :event, function: name} -> topic == name
+          _ -> false
+        end)
+      end
 
-      topic ->
-        selector =
-          if String.contains?(topic, "(") do
-            # this is an event signature, so convert it to a FunctionSelector
-            topic
-            |> ABI.FunctionSelector.decode()
-          else
-            # must be an event name, so find the selector
-            Enum.find(abi, fn
-              %ABI.FunctionSelector{type: :event, function: name} -> topic == name
-              _ -> false
-            end)
-          end
+    selector
+    |> selector_signature()
+    |> W3Events.Util.keccak(hex?: true)
+  end
 
-        selector
-        |> selector_signature()
-        |> W3Events.Util.keccak(hex?: true)
-    end)
+  defp encode_topic(sub_topics, abi) when is_list(sub_topics) do
+    Enum.map(sub_topics, &encode_topic(&1, abi))
   end
 
   defp selector_signature(selector) do

@@ -79,6 +79,39 @@ defmodule W3WS.ABI do
     end
   end
 
+  @doc """
+  Encodes a list of topics into their keccak hex representation
+
+    ## Examples
+    iex> encode_topics([
+    ...>   "0x0000000000000000000000000000000000000000000000000000000000000001", 
+    ...>   "0x0000000000000000000000000000000000000000000000000000000000000002",
+    ...>   "SomeEvent",
+    ...>   ["SomeEvent(uint8,uint8)"],
+    ...>   "MissingAbiEvent(uint8)",
+    ...>  nil
+    ...> ], [
+    ...>   %ABI.FunctionSelector{
+    ...>     function: "SomeEvent",
+    ...>     method_id: <<1, 72, 203, 165>>,
+    ...>     type: :event,
+    ...>     inputs_indexed: [false, false],
+    ...>     state_mutability: nil,
+    ...>     input_names: ["a", "b"],
+    ...>     types: [{:uint, 8}, {:uint, 8}],
+    ...>     returns: [],
+    ...>     return_names: []
+    ...>   } 
+    ...> ])
+    [
+      "0x0000000000000000000000000000000000000000000000000000000000000001", 
+      "0x0000000000000000000000000000000000000000000000000000000000000002", 
+      "0xf4907308003e0ac1411f27720554a08b629260c5bcd94e153d38a3ad5d4ce8ad", 
+      ["0xf4907308003e0ac1411f27720554a08b629260c5bcd94e153d38a3ad5d4ce8ad"], 
+      "0x961ac6e850917325cc201160e6c6a650f0be9ec0fcae82c74d760ab6a9c0e7b0", 
+      nil
+    ]
+  """
   def encode_topics(topics, abi) do
     Enum.map(topics, &encode_topic(&1, abi))
   end
@@ -92,18 +125,24 @@ defmodule W3WS.ABI do
   end
 
   defp encode_topic(topic, abi) when is_binary(topic) do
-    selector =
+    {selector_name, backup_selector} =
       if String.contains?(topic, "(") do
         # this is an event signature, so convert it to a FunctionSelector
-        topic
-        |> ABI.FunctionSelector.decode()
+        selector = %ABI.FunctionSelector{function: name} = ABI.FunctionSelector.decode(topic)
+        {name, selector}
       else
-        # must be an event name, so find the selector
-        Enum.find(abi, fn
-          %ABI.FunctionSelector{type: :event, function: name} -> topic == name
-          _ -> false
-        end)
+        # must be an event name
+        {topic, nil}
       end
+
+    # find the authoritative selector in the ABI so find the selector
+    selector =
+      Enum.find(abi, fn
+        %ABI.FunctionSelector{type: :event, function: name} -> selector_name == name
+        _ -> false
+      end)
+
+    selector = if is_nil(selector), do: backup_selector, else: selector
 
     selector
     |> selector_signature()

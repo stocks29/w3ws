@@ -1,4 +1,4 @@
-defmodule W3Events.ABI do
+defmodule W3WS.ABI do
   def from_files(paths) do
     Enum.flat_map(paths, fn path ->
       path
@@ -63,7 +63,7 @@ defmodule W3Events.ABI do
     topics =
       Enum.map(topics, fn
         nil -> nil
-        topic -> W3Events.Util.from_hex(topic)
+        topic -> W3WS.Util.from_hex(topic)
       end)
 
     case ABI.Event.find_and_decode(
@@ -72,7 +72,7 @@ defmodule W3Events.ABI do
            Enum.at(topics, 1),
            Enum.at(topics, 2),
            Enum.at(topics, 3),
-           W3Events.Util.from_hex(data)
+           W3WS.Util.from_hex(data)
          ) do
       {:error, _} = err -> err
       {selector, event_data} -> {:ok, selector, decode_data(event_data)}
@@ -107,7 +107,7 @@ defmodule W3Events.ABI do
 
     selector
     |> selector_signature()
-    |> W3Events.Util.keccak(hex?: true)
+    |> W3WS.Util.keccak(hex?: true)
   end
 
   defp encode_topic(sub_topics, abi) when is_list(sub_topics) do
@@ -131,8 +131,8 @@ defmodule W3Events.ABI do
     end)
   end
 
-  defp decode_value({_name, "address", _indexed, value}), do: W3Events.Util.to_hex(value)
-  defp decode_value({_name, _type, true, {:dynamic, value}}), do: W3Events.Util.to_hex(value)
+  defp decode_value({_name, "address", _indexed, value}), do: W3WS.Util.to_hex(value)
+  defp decode_value({_name, _type, true, {:dynamic, value}}), do: W3WS.Util.to_hex(value)
   defp decode_value({_name, _type, _indexed, value}), do: value
 
   def selector_fields(selector = %ABI.FunctionSelector{inputs_indexed: nil, types: types}) do

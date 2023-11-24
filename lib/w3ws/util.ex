@@ -1,4 +1,4 @@
-defmodule W3Events.Util do
+defmodule W3WS.Util do
   def to_hex(binary), do: "0x" <> Base.encode16(binary, case: :lower)
 
   def from_hex("0x" <> hex), do: from_hex(hex)

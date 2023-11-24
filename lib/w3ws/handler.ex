@@ -1,16 +1,16 @@
-defmodule W3Events.Handler do
+defmodule W3WS.Handler do
   defmodule HandlerBehaviour do
-    @callback handle(W3Events.Env.t()) :: any()
-    @callback handle_event(W3Events.Env.t()) :: any()
+    @callback handle(W3WS.Env.t()) :: any()
+    @callback handle_event(W3WS.Env.t()) :: any()
   end
 
   defmacro __using__(_) do
     quote do
-      @behaviour W3Events.Handler.HandlerBehaviour
+      @behaviour W3WS.Handler.HandlerBehaviour
 
       require Logger
 
-      alias W3Events.{Env, Event, RawEvent}
+      alias W3WS.{Env, Event, RawEvent}
 
       def handle(%Env{} = env) do
         handle_event(env)
@@ -25,6 +25,6 @@ defmodule W3Events.Handler do
   end
 end
 
-defmodule W3Events.Handler.DefaultHandler do
-  use W3Events.Handler
+defmodule W3WS.Handler.DefaultHandler do
+  use W3WS.Handler
 end

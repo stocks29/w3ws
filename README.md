@@ -1,6 +1,12 @@
-# W3Events
+# W3WS
 
-**TODO: Add description**
+Ethereum websocket library for Elixir
+
+The current focus of this project is on consuming events from the Ethereum 
+blockchain over websockets.
+
+There are currently very few tests. No performance testing has been done.
+Use at your own risk!
 
 ## Installation
 
@@ -10,7 +16,7 @@ by adding `w3_events` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:w3_events, "~> 0.1.0"}
+    {:w3ws, "~> 0.1.0"}
   ]
 end
 ```

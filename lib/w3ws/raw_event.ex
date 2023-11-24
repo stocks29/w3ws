@@ -1,4 +1,4 @@
-defmodule W3Events.RawEvent do
+defmodule W3WS.RawEvent do
   defstruct address: nil,
             block_hash: nil,
             block_number: nil,

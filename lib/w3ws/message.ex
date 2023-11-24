@@ -1,4 +1,4 @@
-defmodule W3Events.Message do
+defmodule W3WS.Message do
   @jsonrpc "2.0"
 
   def eth_block_number(opts \\ []) do

@@ -1,4 +1,4 @@
-defmodule W3Events.ListenerManager do
+defmodule W3WS.ListenerManager do
   use DynamicSupervisor
 
   def start_link(args) do
@@ -28,7 +28,7 @@ defmodule W3Events.ListenerManager do
   def add_listener(pid, config) do
     DynamicSupervisor.start_child(pid, %{
       id: :crypto.hash(:sha, :erlang.term_to_binary(config)),
-      start: {W3Events.Listener, :start_link, [config]}
+      start: {W3WS.Listener, :start_link, [config]}
     })
   end
 
@@ -41,7 +41,7 @@ defmodule W3Events.ListenerManager do
 
   defp get_listeners_from_config(otp_app) do
     otp_app
-    |> Application.get_env(W3Events)
+    |> Application.get_env(W3WS)
     |> maybe_get(:listeners, [])
   end
 

@@ -1,7 +1,7 @@
-defmodule W3Events.Listener do
+defmodule W3WS.Listener do
   use Wind.Client, ping_timer: 10_000
 
-  alias W3Events.{ABI, Message}
+  alias W3WS.{ABI, Message}
 
   require Logger
 
@@ -127,11 +127,11 @@ defmodule W3Events.Listener do
               nil
           end
 
-        topics = W3Events.ABI.encode_topics(subscription[:topics] || [], abi)
+        topics = W3WS.ABI.encode_topics(subscription[:topics] || [], abi)
 
         subscription
         |> Map.merge(%{abi: abi, topics: topics})
-        |> Map.put_new(:handler, W3Events.Handler.DefaultHandler)
+        |> Map.put_new(:handler, W3WS.Handler.DefaultHandler)
       end)
 
     config = Map.put(config, :subscriptions, subscriptions)
@@ -259,7 +259,7 @@ defmodule W3Events.Listener do
     subscription = State.get_subscription_by_id(state, sub_id)
 
     message
-    |> W3Events.Env.from_eth_subscription()
+    |> W3WS.Env.from_eth_subscription()
     |> maybe_decode_event(subscription)
     |> apply_handler(subscription.handler)
 
@@ -271,9 +271,7 @@ defmodule W3Events.Listener do
          %{listener: %{block_ping_id: id}} = state
        ) do
     # this is a block ping response
-    Logger.info(
-      "[BlockPing] current block: #{W3Events.Util.integer_from_hex(result)} (#{result})"
-    )
+    Logger.info("[BlockPing] current block: #{W3WS.Util.integer_from_hex(result)} (#{result})")
 
     State.remove_pending(state, id)
   end
@@ -345,12 +343,12 @@ defmodule W3Events.Listener do
     do: Process.spawn(fn -> fun.(env) end, [])
 
   defp maybe_decode_event(env, %{abi: nil}) do
-    W3Events.Env.with_event(env, W3Events.Event.from_raw_event(env.raw, nil, nil))
+    W3WS.Env.with_event(env, W3WS.Event.from_raw_event(env.raw, nil, nil))
   end
 
   defp maybe_decode_event(env, %{abi: abi}) do
     {selector, decoded_data} =
-      case W3Events.ABI.decode_event(env.raw.data, abi, env.raw.topics) do
+      case W3WS.ABI.decode_event(env.raw.data, abi, env.raw.topics) do
         {:ok, selector, decoded_data} ->
           {selector, decoded_data}
 
@@ -359,7 +357,7 @@ defmodule W3Events.Listener do
           {nil, nil}
       end
 
-    W3Events.Env.with_event(env, W3Events.Event.from_raw_event(env.raw, selector, decoded_data))
+    W3WS.Env.with_event(env, W3WS.Event.from_raw_event(env.raw, selector, decoded_data))
   end
 
   defp send_text_frame(text, state) do

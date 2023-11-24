@@ -5,6 +5,37 @@ defmodule W3Events.Listener do
 
   require Logger
 
+  defmodule State do
+    def get_config(state) do
+      get_in(state, [:opts, :config])
+    end
+
+    def get_uri(state) do
+      get_in(state, [:opts, :config, :uri])
+    end
+
+    def get_subscription_by_id(state, sub_id) do
+      state
+      |> get_subscriptions()
+      |> Enum.find(&(&1[:subscription_id] == sub_id))
+    end
+
+    def get_subscriptions(state) do
+      get_in(state, [:opts, :config, :subscriptions])
+    end
+
+    def set_subscriptions(state, subscriptions) do
+      put_in(state, [:opts, :config, :subscriptions], subscriptions)
+    end
+
+    def set_id(state, id) do
+      case state[:listener] do
+        %{id: _id} -> put_in(state, [:listener, :id], id)
+        nil -> Map.put(state, :listener, %{id: id})
+      end
+    end
+  end
+
   def start_link(config) do
     uri = URI.new!(config.uri)
 
@@ -38,9 +69,8 @@ defmodule W3Events.Listener do
 
   @impl Wind.Client
   def handle_connect(state) do
-    config = Keyword.get(state.opts, :config)
-    subscriptions = config[:subscriptions]
-    uri = config[:uri]
+    subscriptions = State.get_subscriptions(state)
+    uri = State.get_uri(state)
 
     ids = Stream.iterate(1, &(&1 + 1))
 
@@ -73,8 +103,8 @@ defmodule W3Events.Listener do
 
     state =
       state
-      |> put_in([:opts, :config, :subscriptions], subscriptions)
-      |> Map.put(:listener, %{id: max_id})
+      |> State.set_subscriptions(subscriptions)
+      |> State.set_id(max_id)
 
     {:noreply, state}
   end
@@ -93,8 +123,7 @@ defmodule W3Events.Listener do
          message = %{"method" => "eth_subscription", "params" => %{"subscription" => sub_id}},
          state
        ) do
-    config = state.opts[:config]
-    subscription = Enum.find(config[:subscriptions], &(&1[:subscription_id] == sub_id))
+    subscription = State.get_subscription_by_id(state, sub_id)
 
     message
     |> W3Events.Env.from_eth_subscription()
@@ -105,17 +134,17 @@ defmodule W3Events.Listener do
   end
 
   defp handle_decoded_frame(%{"id" => id, "result" => sub_id}, state) do
-    Logger.debug("subscription created: #{sub_id}")
+    Logger.debug("Created subscription: #{sub_id}")
 
     subscriptions =
-      Enum.map(state.opts[:config][:subscriptions], fn subscription ->
+      Enum.map(State.get_subscriptions(state), fn subscription ->
         case subscription[:message_id] do
           ^id -> Map.put(subscription, :subscription_id, sub_id)
           _ -> subscription
         end
       end)
 
-    put_in(state, [:opts, :config, :subscriptions], subscriptions)
+    State.set_subscriptions(state, subscriptions)
   end
 
   defp handle_decoded_frame(message, state) do

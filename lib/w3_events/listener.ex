@@ -14,6 +14,10 @@ defmodule W3Events.Listener do
       get_in(state, [:opts, :config, :uri])
     end
 
+    def get_block_ping_interval(state) do
+      get_in(state, [:opts, :config, :block_ping])
+    end
+
     def get_subscription_by_id(state, sub_id) do
       state
       |> get_subscriptions()
@@ -28,12 +32,28 @@ defmodule W3Events.Listener do
       put_in(state, [:opts, :config, :subscriptions], subscriptions)
     end
 
+    def get_id(state) do
+      get_in(state, [:listener, :id]) || 0
+    end
+
     def set_id(state, id) do
       case state[:listener] do
         %{id: _id} -> put_in(state, [:listener, :id], id)
-        nil -> Map.put(state, :listener, %{id: id})
+        nil -> Map.put(state, :listener, default_listener_state(id))
       end
     end
+
+    def next_id(state) do
+      new_id = get_id(state) + 1
+      {new_id, set_id(state, new_id)}
+    end
+
+    def next_block_ping_id(state) do
+      {id, state} = next_id(state)
+      {id, put_in(state, [:listener, :block_ping_id], id)}
+    end
+
+    defp default_listener_state(id), do: %{id: id, block_ping_id: nil}
   end
 
   def start_link(config) do
@@ -105,8 +125,32 @@ defmodule W3Events.Listener do
       state
       |> State.set_subscriptions(subscriptions)
       |> State.set_id(max_id)
+      |> maybe_schedule_block_ping()
 
     {:noreply, state}
+  end
+
+  defp maybe_schedule_block_ping(state) do
+    if ping_interval = State.get_block_ping_interval(state) do
+      Process.send_after(self(), :block_ping, ping_interval)
+    end
+
+    state
+  end
+
+  @impl GenServer
+  def handle_info(:block_ping, state) do
+    {id, state} = State.next_block_ping_id(state)
+
+    Message.eth_block_number(id: id)
+    |> Message.encode!()
+    |> send_text_frame(state)
+
+    {:noreply, maybe_schedule_block_ping(state)}
+  end
+
+  def handle_info(message, state) do
+    super(message, state)
   end
 
   @impl Wind.Client
@@ -129,6 +173,18 @@ defmodule W3Events.Listener do
     |> W3Events.Env.from_eth_subscription()
     |> maybe_decode_event(subscription)
     |> apply_handler(subscription.handler)
+
+    state
+  end
+
+  defp handle_decoded_frame(
+         %{"id" => id, "result" => result},
+         %{listener: %{block_ping_id: id}} = state
+       ) do
+    # this is a block ping response
+    Logger.info(
+      "[BlockPing] current block: #{W3Events.Util.integer_from_hex(result)} (#{result})"
+    )
 
     state
   end

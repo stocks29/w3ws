@@ -99,6 +99,10 @@ defmodule W3WS.Listener do
   end
 
   defmodule Subscription do
+    def get_context(subscription) do
+      Map.get(subscription, :context, %{})
+    end
+
     def set_subscription_id(subscription, sub_id) do
       Map.put(subscription, :subscription_id, sub_id)
     end
@@ -257,9 +261,10 @@ defmodule W3WS.Listener do
          state
        ) do
     subscription = State.get_subscription_by_id(state, sub_id)
+    context = Subscription.get_context(subscription)
 
     message
-    |> W3WS.Env.from_eth_subscription()
+    |> W3WS.Env.from_eth_subscription(context)
     |> maybe_decode_event(subscription)
     |> apply_handler(subscription.handler)
 

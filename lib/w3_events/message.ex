@@ -27,6 +27,15 @@ defmodule W3Events.Message do
     eth_subscribe([:logs, args], opts)
   end
 
+  def eth_unsubscribe(sub_id, opts \\ []) do
+    %{
+      jsonrpc: @jsonrpc,
+      id: id(opts),
+      method: :eth_unsubscribe,
+      params: [sub_id]
+    }
+  end
+
   def encode!(message), do: Jason.encode!(message)
   def decode!(message), do: Jason.decode!(message)
 

@@ -18,6 +18,10 @@ defmodule W3Events.Listener do
       get_in(state, [:opts, :config, :block_ping])
     end
 
+    def get_resubscribe_interval(state) do
+      get_in(state, [:opts, :config, :resubscribe])
+    end
+
     def get_subscription_by_id(state, sub_id) do
       state
       |> get_subscriptions()
@@ -54,6 +58,25 @@ defmodule W3Events.Listener do
     end
 
     defp default_listener_state(id), do: %{id: id, block_ping_id: nil}
+
+    def update_subscriptions(state, fun) do
+      subscriptions =
+        state
+        |> get_subscriptions()
+        |> Enum.map(&fun.(&1))
+
+      set_subscriptions(state, subscriptions)
+    end
+  end
+
+  defmodule Subscription do
+    def set_subscription_id(subscription, sub_id) do
+      Map.put(subscription, :subscription_id, sub_id)
+    end
+
+    def set_message_id(subscription, message_id) do
+      Map.put(subscription, :message_id, message_id)
+    end
   end
 
   def start_link(config) do
@@ -89,10 +112,15 @@ defmodule W3Events.Listener do
 
   @impl Wind.Client
   def handle_connect(state) do
+    {:noreply, subscribe_subscriptions(state)}
+  end
+
+  defp subscribe_subscriptions(state) do
     subscriptions = State.get_subscriptions(state)
     uri = State.get_uri(state)
+    next_id = State.get_id(state) + 1
 
-    ids = Stream.iterate(1, &(&1 + 1))
+    ids = Stream.iterate(next_id, &(&1 + 1))
 
     subscriptions =
       Enum.zip_reduce(subscriptions, ids, [], fn subscription, id, subscriptions ->
@@ -121,18 +149,41 @@ defmodule W3Events.Listener do
       |> Enum.map(fn %{message_id: id} -> id end)
       |> Enum.max(&>=/2, fn -> 0 end)
 
-    state =
-      state
-      |> State.set_subscriptions(subscriptions)
-      |> State.set_id(max_id)
-      |> maybe_schedule_block_ping()
+    state
+    |> State.set_subscriptions(subscriptions)
+    |> State.set_id(max_id)
+    |> maybe_schedule_helpers()
+  end
 
-    {:noreply, state}
+  defp unsubscribe_subscriptions(state) do
+    State.update_subscriptions(state, fn subscription = %{subscription_id: sub_id} ->
+      Message.eth_unsubscribe(sub_id)
+      |> Message.encode!()
+      |> send_text_frame(state)
+
+      subscription
+      |> Subscription.set_subscription_id(nil)
+      |> Subscription.set_message_id(nil)
+    end)
+  end
+
+  defp maybe_schedule_helpers(state) do
+    state
+    |> maybe_schedule_block_ping()
+    |> maybe_schedule_resubscribe()
   end
 
   defp maybe_schedule_block_ping(state) do
-    if ping_interval = State.get_block_ping_interval(state) do
-      Process.send_after(self(), :block_ping, ping_interval)
+    maybe_schedule(&State.get_block_ping_interval/1, :block_ping, state)
+  end
+
+  defp maybe_schedule_resubscribe(state) do
+    maybe_schedule(&State.get_resubscribe_interval/1, :resubscribe, state)
+  end
+
+  defp maybe_schedule(interval_fun, event, state) do
+    if interval = interval_fun.(state) do
+      Process.send_after(self(), event, interval)
     end
 
     state
@@ -147,6 +198,15 @@ defmodule W3Events.Listener do
     |> send_text_frame(state)
 
     {:noreply, maybe_schedule_block_ping(state)}
+  end
+
+  def handle_info(:resubscribe, state) do
+    state =
+      state
+      |> unsubscribe_subscriptions()
+      |> subscribe_subscriptions()
+
+    {:noreply, state}
   end
 
   def handle_info(message, state) do
@@ -189,18 +249,20 @@ defmodule W3Events.Listener do
     state
   end
 
+  defp handle_decoded_frame(%{"id" => _id, "result" => result}, state) when is_boolean(result) do
+    Logger.debug("Destroyed subscription: #{result}")
+    state
+  end
+
   defp handle_decoded_frame(%{"id" => id, "result" => sub_id}, state) do
     Logger.debug("Created subscription: #{sub_id}")
 
-    subscriptions =
-      Enum.map(State.get_subscriptions(state), fn subscription ->
-        case subscription[:message_id] do
-          ^id -> Map.put(subscription, :subscription_id, sub_id)
-          _ -> subscription
-        end
-      end)
-
-    State.set_subscriptions(state, subscriptions)
+    State.update_subscriptions(state, fn subscription ->
+      case subscription[:message_id] do
+        ^id -> Map.put(subscription, :subscription_id, sub_id)
+        _ -> subscription
+      end
+    end)
   end
 
   defp handle_decoded_frame(message, state) do

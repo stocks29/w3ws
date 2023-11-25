@@ -9,6 +9,8 @@ defmodule W3Events.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
+      package: package(),
+      description: description(),
       deps: deps()
     ]
   end
@@ -22,6 +24,18 @@ defmodule W3Events.MixProject do
 
   defp elixirc_paths(env) when env in [:test], do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
+
+  defp package do
+    [
+      name: "w3ws",
+      licenses: ["MIT"],
+      links: %{"GitHub" => "https://github.com/stocks29/w3ws"}
+    ]
+  end
+
+  defp description do
+    "Ethereum websocket library for Elixir"
+  end
 
   defp aliases do
     [docs: ["docs", &copy_images/1]]

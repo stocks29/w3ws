@@ -1,5 +1,4 @@
 defmodule W3WS do
-  @moduledoc """
-  Documentation for `W3WS`.
-  """
+  @moduledoc File.read!("README.md")
+  @test 1
 end

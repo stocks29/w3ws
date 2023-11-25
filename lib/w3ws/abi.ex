@@ -1,4 +1,25 @@
 defmodule W3WS.ABI do
+  @moduledoc """
+  Ethereum ABI Functions
+  """
+
+  @doc """
+  Loads ABIs from an `Enumerable` of abi file paths
+
+  ## Examples
+
+      iex> from_files(["./test/support/files/test_abi.json"])
+      [
+        %ABI.FunctionSelector{
+          type: :event,
+          function: "Transfer",
+          method_id: <<221, 242, 82, 173>>,
+          input_names: ["from", "to", "value"],
+          inputs_indexed: [false, false, false],
+          types: [:address, :address, {:uint, 256}]
+        }
+      ]
+  """
   def from_files(paths) do
     Enum.flat_map(paths, fn path ->
       path
@@ -9,6 +30,48 @@ defmodule W3WS.ABI do
     end)
   end
 
+  @doc """
+  Loads an ABI from a json decoded ABI spec
+
+  ## Examples
+
+      iex> from_abi([
+      ...>   %{
+      ...>     "name" => "Transfer",
+      ...>     "type" => "event",
+      ...>     "inputs" => [
+      ...>       %{
+      ...>         "name" => "from",
+      ...>         "type" => "address",
+      ...>         "indexed" => false,
+      ...>         "internalType" => "address"
+      ...>       },
+      ...>       %{
+      ...>         "name" => "to",
+      ...>         "type" => "address",
+      ...>         "indexed" => false,
+      ...>         "internalType" => "address"
+      ...>       },
+      ...>       %{
+      ...>         "name" => "value",
+      ...>         "type" => "uint256",
+      ...>         "indexed" => false,
+      ...>         "internalType" => "uint256"
+      ...>       }
+      ...>     ]
+      ...>   }
+      ...> ])
+      [
+        %ABI.FunctionSelector{
+          type: :event,
+          function: "Transfer",
+          method_id: <<221, 242, 82, 173>>,
+          input_names: ["from", "to", "value"],
+          inputs_indexed: [false, false, false],
+          types: [:address, :address, {:uint, 256}]
+        }
+      ]
+  """
   def from_abi(abi) do
     abi
     |> ABI.parse_specification(include_events?: true)
@@ -24,41 +87,45 @@ defmodule W3WS.ABI do
 
   ## Examples
 
-    iex> decode_event(
-    ...>   "0x0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000959922be3caee4b8cd9a407cc3ac1c251c2007b10000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000034152420000000000000000000000000000000000000000000000000000000000",
-    ...>   [
-    ...>      %ABI.FunctionSelector{
-    ...>        function: "TokenSupportChange",
-    ...>        method_id: <<1, 72, 203, 165>>,
-    ...>        type: :event,
-    ...>        inputs_indexed: [false, false, false, false],
-    ...>        state_mutability: nil,
-    ...>        input_names: ["supported", "token", "symbol", "decimals"],
-    ...>        types: [:bool, :address, :string, {:uint, 8}],
-    ...>        returns: [],
-    ...>        return_names: []
-    ...>      }
-    ...>   ],
-    ...>   ["0x0148cba56e5d3a8d32fbcea206eae9e449ec0f0def4f642994b3edcd38561deb"]
-    ...> )
-    {
-      :ok, 
-      %ABI.FunctionSelector{
-        function: "TokenSupportChange",
-        method_id: <<1, 72, 203, 165>>,
-        type: :event,
-        inputs_indexed: [false, false, false, false],
-        state_mutability: nil,
-        input_names: ["supported", "token", "symbol", "decimals"],
-        types: [:bool, :address, :string, {:uint, 8}],
-        returns: [],
-        return_names: []
-      }, 
-      %{"decimals" => 18, "supported" => true, "symbol" => "ARB", "token" => "0x959922be3caee4b8cd9a407cc3ac1c251c2007b1"}
-    }
+      iex> decode_event(
+      ...>   "0x0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000959922be3caee4b8cd9a407cc3ac1c251c2007b10000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000034152420000000000000000000000000000000000000000000000000000000000",
+      ...>   [
+      ...>      %ABI.FunctionSelector{
+      ...>        function: "TokenSupportChange",
+      ...>        method_id: <<1, 72, 203, 165>>,
+      ...>        type: :event,
+      ...>        inputs_indexed: [false, false, false, false],
+      ...>        state_mutability: nil,
+      ...>        input_names: ["supported", "token", "symbol", "decimals"],
+      ...>        types: [:bool, :address, :string, {:uint, 8}],
+      ...>        returns: [],
+      ...>        return_names: []
+      ...>      }
+      ...>   ],
+      ...>   ["0x0148cba56e5d3a8d32fbcea206eae9e449ec0f0def4f642994b3edcd38561deb"]
+      ...> )
+      {:ok, 
+        %ABI.FunctionSelector{
+          function: "TokenSupportChange",
+          method_id: <<1, 72, 203, 165>>,
+          type: :event,
+          inputs_indexed: [false, false, false, false],
+          state_mutability: nil,
+          input_names: ["supported", "token", "symbol", "decimals"],
+          types: [:bool, :address, :string, {:uint, 8}],
+          returns: [],
+          return_names: []
+        }, 
+        %{
+          "decimals" => 18, 
+          "supported" => true, 
+          "symbol" => "ARB", 
+          "token" => "0x959922be3caee4b8cd9a407cc3ac1c251c2007b1"
+        }
+      }
   """
-  @spec decode_event(binary(), ABI.specification(), [binary()]) ::
-          {:ok, ABI.selector(), map()} | {:error, any()}
+  @spec decode_event(binary(), list(%ABI.FunctionSelector{}), [binary()]) ::
+          {:ok, %ABI.FunctionSelector{}, map()} | {:error, any()}
   def decode_event(data, abi, topics) do
     topics =
       Enum.map(topics, fn
@@ -82,35 +149,36 @@ defmodule W3WS.ABI do
   @doc """
   Encodes a list of topics into their keccak hex representation
 
-    ## Examples
-    iex> encode_topics([
-    ...>   "0x0000000000000000000000000000000000000000000000000000000000000001", 
-    ...>   "0x0000000000000000000000000000000000000000000000000000000000000002",
-    ...>   "SomeEvent",
-    ...>   ["SomeEvent(uint8,uint8)"],
-    ...>   "MissingAbiEvent(uint8)",
-    ...>  nil
-    ...> ], [
-    ...>   %ABI.FunctionSelector{
-    ...>     function: "SomeEvent",
-    ...>     method_id: <<1, 72, 203, 165>>,
-    ...>     type: :event,
-    ...>     inputs_indexed: [false, false],
-    ...>     state_mutability: nil,
-    ...>     input_names: ["a", "b"],
-    ...>     types: [{:uint, 8}, {:uint, 8}],
-    ...>     returns: [],
-    ...>     return_names: []
-    ...>   } 
-    ...> ])
-    [
-      "0x0000000000000000000000000000000000000000000000000000000000000001", 
-      "0x0000000000000000000000000000000000000000000000000000000000000002", 
-      "0xf4907308003e0ac1411f27720554a08b629260c5bcd94e153d38a3ad5d4ce8ad", 
-      ["0xf4907308003e0ac1411f27720554a08b629260c5bcd94e153d38a3ad5d4ce8ad"], 
-      "0x961ac6e850917325cc201160e6c6a650f0be9ec0fcae82c74d760ab6a9c0e7b0", 
-      nil
-    ]
+  ## Examples
+
+      iex> encode_topics([
+      ...>   "0x0000000000000000000000000000000000000000000000000000000000000001", 
+      ...>   "0x0000000000000000000000000000000000000000000000000000000000000002",
+      ...>   "SomeEvent",
+      ...>   ["SomeEvent(uint8,uint8)"],
+      ...>   "MissingAbiEvent(uint8)",
+      ...>  nil
+      ...> ], [
+      ...>   %ABI.FunctionSelector{
+      ...>     function: "SomeEvent",
+      ...>     method_id: <<1, 72, 203, 165>>,
+      ...>     type: :event,
+      ...>     inputs_indexed: [false, false],
+      ...>     state_mutability: nil,
+      ...>     input_names: ["a", "b"],
+      ...>     types: [{:uint, 8}, {:uint, 8}],
+      ...>     returns: [],
+      ...>     return_names: []
+      ...>   } 
+      ...> ])
+      [
+        "0x0000000000000000000000000000000000000000000000000000000000000001", 
+        "0x0000000000000000000000000000000000000000000000000000000000000002", 
+        "0xf4907308003e0ac1411f27720554a08b629260c5bcd94e153d38a3ad5d4ce8ad", 
+        ["0xf4907308003e0ac1411f27720554a08b629260c5bcd94e153d38a3ad5d4ce8ad"], 
+        "0x961ac6e850917325cc201160e6c6a650f0be9ec0fcae82c74d760ab6a9c0e7b0", 
+        nil
+      ]
   """
   def encode_topics(topics, abi) do
     Enum.map(topics, &encode_topic(&1, abi))
@@ -174,6 +242,27 @@ defmodule W3WS.ABI do
   defp decode_value({_name, _type, true, {:dynamic, value}}), do: W3WS.Util.to_hex(value)
   defp decode_value({_name, _type, _indexed, value}), do: value
 
+  @doc """
+  Returns a list of ABI fields for the given selector
+
+  ## Examples
+
+      iex> selector_fields(%ABI.FunctionSelector{
+      ...>   function: "SomeEvent", 
+      ...>   method_id: <<1, 72, 203, 165>>,
+      ...>   type: :event,
+      ...>   inputs_indexed: [false, false],
+      ...>   input_names: ["a", "b"],
+      ...>   types: [{:uint, 8}, {:uint, 8}],
+      ...>   returns: [],
+      ...>   return_names: []
+      ...> })
+      [
+        %{name: "a", indexed: false, type: {:uint, 8}},
+        %{name: "b", indexed: false, type: {:uint, 8}}
+      ]
+  """
+  @spec selector_fields(selector :: %ABI.FunctionSelector{}) :: list(map())
   def selector_fields(selector = %ABI.FunctionSelector{inputs_indexed: nil, types: types}) do
     stream = Stream.repeatedly(fn -> false end)
 

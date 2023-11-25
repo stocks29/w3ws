@@ -1,4 +1,19 @@
 defmodule W3WS.RawEvent do
+  @moduledoc """
+  W3WS RawEvent represents an encoded event.
+  """
+
+  @type t :: %__MODULE__{
+          address: String.t(),
+          block_hash: String.t(),
+          block_number: String.t(),
+          data: String.t(),
+          log_index: String.t(),
+          removed: boolean(),
+          topics: list(String.t()),
+          transaction_hash: String.t(),
+          transaction_index: String.t()
+        }
   defstruct address: nil,
             block_hash: nil,
             block_number: nil,
@@ -9,6 +24,10 @@ defmodule W3WS.RawEvent do
             transaction_hash: nil,
             transaction_index: nil
 
+  @doc """
+  Create a `RawEvent` from a map of log event data
+  """
+  @spec from_map(map()) :: t()
   def from_map(%{
         "address" => address,
         "blockHash" => block_hash,

@@ -1,11 +1,44 @@
 defmodule W3WS.Listener do
+  @moduledoc """
+  W3WS Listener which handles the websocket connection and subscribes to
+  configured ethereum events.
+
+  If an ABI is provided and the event has a matching selector in the ABI
+  the event will be decoded and passed to the handler in the `Env`. If no matching
+  selector is found the non-decoded event will be passed to the handler.
+
+  ABIs are subscription specific, so different ABIs can be used to decode
+  different events using separate subscriptions.
+
+  See `W3WS.Listener.start_link/1` for all configuration options.
+  """
+
   use Wind.Client, ping_timer: 10_000
 
   alias W3WS.{ABI, Message}
 
   require Logger
 
+  @type subscription_config :: %{
+          abi: list(map()) | nil,
+          abi_files: list(String.t()) | nil,
+          context: map() | nil,
+          handler:
+            module() | (env :: W3WS.Env.t() -> any()) | {module(), atom(), list(any())} | nil,
+          topics: list(String.t()) | nil,
+          address: String.t() | nil
+        }
+
+  @type listener_config :: %{
+          uri: String.t(),
+          block_ping: pos_integer() | nil,
+          resubscribe: pos_integer() | nil,
+          subscriptions: list(subscription_config()) | nil
+        }
+
   defmodule State do
+    @moduledoc false
+
     def get_config(state) do
       get_in(state, [:opts, :config])
     end
@@ -57,7 +90,7 @@ defmodule W3WS.Listener do
       {id, put_in(state, [:listener, :block_ping_id], id)}
     end
 
-    defp default_listener_state(id), do: %{id: id, block_ping_id: nil, pending: %{}}
+    defp default_listener_state(id), do: %{id: id, block: nil, block_ping_id: nil, pending: %{}}
 
     @doc """
     Add a pending request
@@ -73,6 +106,20 @@ defmodule W3WS.Listener do
     """
     def remove_pending(state, id) do
       update_in(state, [:listener, :pending], &Map.delete(&1, id))
+    end
+
+    @doc """
+    Set the block in the listener
+    """
+    def set_block(state, block) do
+      put_in(state, [:listener, :block], block)
+    end
+
+    @doc """
+    Get the block from the listener
+    """
+    def get_block(state) do
+      get_in(state, [:listener, :block])
     end
 
     # subscriptions in the state are not currently updated during the callback. that a prob?
@@ -99,6 +146,8 @@ defmodule W3WS.Listener do
   end
 
   defmodule Subscription do
+    @moduledoc false
+
     def get_context(subscription) do
       Map.get(subscription, :context, %{})
     end
@@ -112,6 +161,33 @@ defmodule W3WS.Listener do
     end
   end
 
+  @doc """
+  Start the listener
+
+  ## Examples
+
+  Start a listener with no subscriptions
+
+      {:ok, listener} = W3WS.Listener.start_link(%{uri: "http://localhost:8545"})
+
+  Start a listener with subscriptions
+
+      {:ok, listener} = W3WS.Listener.start_link(%{
+        uri: "http://localhost:8545",
+        block_ping: :timer.seconds(10),
+        resubscribe: :timer.minutes(5),
+        subscriptions: [
+          %{
+            abi_files: ["path/to/abi.json"],
+            context: %{chain_id: 1},
+            handler: W3WS.Handler.DefaultHandler,
+            topics: ["Transfer"],
+            address: "0x73d578371eb449726d727376393b02bb3b8e6a57"
+          }
+        ]
+      })
+  """
+  @spec start_link(listener_config()) :: {:ok, pid()}
   def start_link(config) do
     uri = URI.new!(config.uri)
 
@@ -223,14 +299,29 @@ defmodule W3WS.Listener do
     state
   end
 
+  @doc """
+  Returns the last block number received by `block_ping`. If `block_ping` is not enabled
+  or the first `block_ping` response hasn't been received yet, `nil` is returned.
+  """
+  def get_block(pid) do
+    GenServer.call(pid, :block)
+  end
+
+  @impl GenServer
+  def handle_call(:block, _from, state) do
+    {:reply, State.get_block(state), state}
+  end
+
   @impl GenServer
   def handle_info(:block_ping, state) do
     {id, state} = State.next_block_ping_id(state)
 
-    Message.eth_block_number(id: id)
-    |> send_pending(state)
+    state =
+      Message.eth_block_number(id: id)
+      |> send_pending(state)
+      |> maybe_schedule_block_ping()
 
-    {:noreply, maybe_schedule_block_ping(state)}
+    {:noreply, state}
   end
 
   def handle_info(:resubscribe, state) do
@@ -276,9 +367,12 @@ defmodule W3WS.Listener do
          %{listener: %{block_ping_id: id}} = state
        ) do
     # this is a block ping response
-    Logger.info("[BlockPing] current block: #{W3WS.Util.integer_from_hex(result)} (#{result})")
+    block_number = W3WS.Util.integer_from_hex(result)
+    Logger.info("[BlockPing] current block: #{block_number} (#{result})")
 
-    State.remove_pending(state, id)
+    state
+    |> State.remove_pending(id)
+    |> State.set_block(block_number)
   end
 
   defp handle_decoded_frame(

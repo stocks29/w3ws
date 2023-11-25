@@ -1,3 +1,5 @@
+# W3WS
+
 Ethereum websocket library for Elixir
 
 ![w3ws logo](./logo.jpg)

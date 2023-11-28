@@ -27,6 +27,8 @@ defmodule W3WS.Handler do
       end
   """
 
+  @type t() :: module() | (env :: W3WS.Env.t() -> any()) | {module(), atom(), list()}
+
   @doc """
   Callback invoked for each received event
   """

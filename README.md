@@ -35,6 +35,8 @@ end
 
 Documentation can be found at <https://hexdocs.pm/w3ws>.
 
+### Event Listener
+
 Configure the listeners for your application:
 
 ```elixir
@@ -108,13 +110,64 @@ children = [
 Supervisor.start_link(children, strategy: :one_for_one)
 ```
 
+### Replay Events
+
+Replay events for a set of blocks.
+
+```elixir
+W3WS.Replayer.replay(
+  abi_files: abi_paths,
+  uri: uri,
+  from_block: 1_000_000,
+  chunk_size: 10_000,
+  chunk_sleep: 5_000,
+  handler: MyApp.Handler,
+  replays: [
+    [address: "0x0000000000000000000000000000000000000000", topics: ["Transfer"]],
+    [address: "0x9999999999999999999999999999999999999999", topics: ["Mint"]]
+    [
+      address: "0x5555555555555555555555555555555555555555", 
+      from_block: 1_500_000,
+      handler: MyApp.SwapHandler,
+      topics: ["Swap"]
+    ]
+  ]
+)
+```
+
+Add a replay task to your task supervisor:
+
+```elixir
+W3WS.Replayer.start(
+  supervisor,
+  abi_files: abi_paths,
+  uri: uri,
+  from_block: 1_000_000,
+  chunk_size: 10_000,
+  chunk_sleep: 5_000,
+  handler: MyApp.Handler,
+  replays: [
+    [address: "0x0000000000000000000000000000000000000000", topics: ["Transfer"]],
+    [address: "0x9999999999999999999999999999999999999999", topics: ["Mint"]]
+    [
+      address: "0x5555555555555555555555555555555555555555", 
+      from_block: 1_500_000,
+      handler: MyApp.SwapHandler,
+      topics: ["Swap"]
+    ]
+  ]
+)
+```
+
+### Handler
+
 Define a handler:
 
 ```elixir
 defmodule MyApp.Handler do
   use W3WS.Handler
 
-  @impl true
+  @impl W3WS.Handler
   def handle_event(
         %Env{
             decoded?: true, 
@@ -126,11 +179,11 @@ end
 ```
 
 Each handler is executed in an unlinked process so handler errors will not bring down 
-the listener process. Events are not retried on failure so be sure your handler
+the calling process. Events are not retried on failure so be sure your handler
 properly handles errors or queues event processing into a resilient framework. The
-listener does not wait on the handler to complete. If serialized events are important
-to you, you will need to serialize them yourself. The return value from the handler is
-ignored.
+listener does not wait on the handler to complete. If serial processing of events is 
+important to you, you will need to handle this yourself. The return value from the 
+handler is ignored.
 
 See the [documentation](https://hexdocs.pm/w3ws) for additional usage.
 

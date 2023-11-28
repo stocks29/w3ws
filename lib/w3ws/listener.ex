@@ -15,7 +15,7 @@ defmodule W3WS.Listener do
 
   use Wind.Client, ping_timer: 10_000
 
-  alias W3WS.{ABI, Message}
+  alias W3WS.Message
 
   require Logger
 
@@ -23,8 +23,7 @@ defmodule W3WS.Listener do
           abi: list(map()) | nil,
           abi_files: list(String.t()) | nil,
           context: map() | nil,
-          handler:
-            module() | (env :: W3WS.Env.t() -> any()) | {module(), atom(), list(any())} | nil,
+          handler: W3WS.Handler.t() | nil,
           topics: list(String.t()) | nil,
           address: String.t() | nil
         }
@@ -195,18 +194,7 @@ defmodule W3WS.Listener do
     subscriptions =
       (config[:subscriptions] || [%{}])
       |> Enum.map(fn subscription ->
-        abi =
-          cond do
-            subscription[:abi_files] ->
-              ABI.from_files(subscription[:abi_files])
-
-            subscription[:abi] ->
-              ABI.from_abi(subscription[:abi])
-
-            true ->
-              nil
-          end
-
+        abi = W3WS.Util.resolve_abi(subscription)
         topics = W3WS.ABI.encode_topics(subscription[:topics] || [], abi)
 
         subscription
@@ -351,13 +339,12 @@ defmodule W3WS.Listener do
          message = %{"method" => "eth_subscription", "params" => %{"subscription" => sub_id}},
          state
        ) do
-    subscription = State.get_subscription_by_id(state, sub_id)
-    context = Subscription.get_context(subscription)
+    sub = State.get_subscription_by_id(state, sub_id)
+    context = Subscription.get_context(sub)
 
     message
     |> W3WS.Env.from_eth_subscription(context)
-    |> maybe_decode_event(subscription)
-    |> apply_handler(subscription.handler)
+    |> W3WS.Util.decode_apply(sub[:abi], sub[:handler])
 
     state
   end
@@ -430,33 +417,6 @@ defmodule W3WS.Listener do
        ) do
     Logger.warning("Failed to destory subscription: #{sub_id}")
     state
-  end
-
-  # we spawn processes (and don't link) so handler errors do not take down the listener process
-  defp apply_handler(env, {m, f, a}), do: Process.spawn(m, f, [env | a], [])
-
-  defp apply_handler(env, handler) when is_atom(handler),
-    do: Process.spawn(handler, :handle, [env], [])
-
-  defp apply_handler(env, fun) when is_function(fun),
-    do: Process.spawn(fn -> fun.(env) end, [])
-
-  defp maybe_decode_event(env, %{abi: nil}) do
-    W3WS.Env.with_event(env, W3WS.Event.from_raw_event(env.raw, nil, nil))
-  end
-
-  defp maybe_decode_event(env, %{abi: abi}) do
-    {selector, decoded_data} =
-      case W3WS.ABI.decode_event(env.raw.data, abi, env.raw.topics) do
-        {:ok, selector, decoded_data} ->
-          {selector, decoded_data}
-
-        {:error, _} = err ->
-          Logger.warning("unable to decode event error=#{inspect(err)} event=#{inspect(env.raw)}")
-          {nil, nil}
-      end
-
-    W3WS.Env.with_event(env, W3WS.Event.from_raw_event(env.raw, selector, decoded_data))
   end
 
   defp send_text_frame(text, state) do

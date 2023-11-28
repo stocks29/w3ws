@@ -3,6 +3,8 @@ defmodule W3WS.ABI do
   Ethereum ABI Functions
   """
 
+  @type t :: list(%ABI.FunctionSelector{})
+
   @doc """
   Loads ABIs from an `Enumerable` of abi file paths
 

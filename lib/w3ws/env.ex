@@ -7,10 +7,10 @@ defmodule W3WS.Env do
           event: W3WS.Event.t() | nil,
           context: map(),
           decoded?: boolean(),
-          jsonrpc: String.t(),
-          method: String.t(),
+          jsonrpc: String.t() | nil,
+          method: String.t() | nil,
           raw: W3WS.RawEvent.t(),
-          subscription: String.t()
+          subscription: String.t() | nil
         }
   defstruct event: nil,
             context: %{},
@@ -85,6 +85,51 @@ defmodule W3WS.Env do
       method: method,
       raw: W3WS.RawEvent.from_map(result),
       subscription: subscription
+    }
+  end
+
+  @doc """
+  Create an envelope from a log, like those returned by `eth_getLogs`
+
+  ## Examples
+    
+      iex> from_log(%{
+      ...>   "address" => "0xAddress",
+      ...>   "blockHash" => "0xBlockHash",
+      ...>   "blockNumber" => "0x1",
+      ...>   "data" => "0xData",
+      ...>   "logIndex" => "0x0",
+      ...>   "removed" => false,
+      ...>   "topics" => ["0xTopic"],
+      ...>   "transactionHash" => "0xTransactionHash",
+      ...>   "transactionIndex" => "0x2"
+      ...>   }, %{chain_id: 1})
+      %W3WS.Env{
+        context: %{chain_id: 1},
+        decoded?: false,
+        event: nil,
+        jsonrpc: nil,
+        method: nil,
+        raw: %W3WS.RawEvent{
+          address: "0xAddress",
+          block_hash: "0xBlockHash",
+          block_number: "0x1",
+          data: "0xData",
+          log_index: "0x0",
+          removed: false,
+          topics: ["0xTopic"],
+          transaction_hash: "0xTransactionHash",
+          transaction_index: "0x2"
+        },
+        subscription: nil
+      }
+
+  """
+  @spec from_log(response :: map(), context :: map()) :: t()
+  def from_log(log, context) do
+    %__MODULE__{
+      context: context,
+      raw: W3WS.RawEvent.from_map(log)
     }
   end
 

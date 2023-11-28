@@ -6,38 +6,7 @@ defmodule W3WS.ListenerTest do
 
   @port 9955
 
-  @abi [
-    %{
-      "name" => "TokenSupportChange",
-      "type" => "event",
-      "inputs" => [
-        %{
-          "name" => "supported",
-          "indexed" => false,
-          "internalType" => "bool",
-          "type" => "bool"
-        },
-        %{
-          "name" => "token",
-          "indexed" => false,
-          "internalType" => "address",
-          "type" => "address"
-        },
-        %{
-          "name" => "symbol",
-          "indexed" => false,
-          "internalType" => "string",
-          "type" => "string"
-        },
-        %{
-          "name" => "decimals",
-          "indexed" => false,
-          "internalType" => "uint8",
-          "type" => "uint8"
-        }
-      ]
-    }
-  ]
+  @abi W3WS.Fixtures.AbiFixtures.abi_fixture()
 
   alias W3WS.Listener
 

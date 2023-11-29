@@ -84,7 +84,8 @@ defmodule W3WS.WsServer do
                 Jason.encode!(%{
                   "id" => data["id"],
                   "jsonrpc" => "2.0",
-                  "method" => "eth_subscribe",
+                  # alchemy does not include this field in resp, so not including it here
+                  # "method" => "eth_subscribe",
                   "result" => "0x9"
                 })
               }

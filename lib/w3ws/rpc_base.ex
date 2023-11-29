@@ -273,20 +273,22 @@ defmodule W3WS.RpcBase do
 
   # this is the response from setting up a subscription, so we need to record the
   # subscription mapping to the process that requested it.
+  # alchemy does not send the `method` field in the response so we need to match
+  # against the original request that was sent.
   defp update_subs(
-         %{"method" => "eth_subscribe", "result" => subscription},
-         _request,
+         %{"result" => subscription},
+         %{method: :eth_subscribe},
          {_type, pid, _ref},
          state
        ) do
-    Logger.debug("tracking subscription #{subscription} for #{inspect(pid)}")
+    Logger.info("tracking subscription #{subscription} for #{inspect(pid)}")
     monitor_ref = Process.monitor(pid)
     RpcState.add_subscription(state, subscription, pid, monitor_ref)
   end
 
   defp update_subs(%{"method" => "eth_unsubscribe"}, %{params: [subscription]}, from, state) do
     {_pid, monitor_ref} = RpcState.get_subscription(state, subscription)
-    Logger.debug("stopped tracking subscription #{subscription} for #{inspect(from)}")
+    Logger.info("stopped tracking subscription #{subscription} for #{inspect(from)}")
     Process.demonitor(monitor_ref)
     RpcState.remove_subscription(state, subscription)
   end

@@ -66,8 +66,9 @@ defmodule W3WS.RpcBase do
     end
 
     def get_and_clear_queued(state) do
+      # reverse the queue so message are sent in same order
       queued = get_in(state, [@key, :queued])
-      {queued, put_in(state, [@key, :queued], [])}
+      {Enum.reverse(queued), put_in(state, [@key, :queued], [])}
     end
 
     def connected(state) do
@@ -112,10 +113,12 @@ defmodule W3WS.RpcBase do
     end
   end
 
+  @type from :: {:async | :sync, pid(), reference()}
+
   @callback handle_response(
               message :: map(),
               request :: map(),
-              from :: {pid(), any()} | nil,
+              from :: from(),
               state :: map()
             ) :: map()
 
@@ -162,7 +165,7 @@ defmodule W3WS.RpcBase do
         end
       end
 
-      defp send_msg(msg, from \\ self(), state)
+      defp send_msg(msg, from, state)
 
       # not yet connected, so queue the message
       defp send_msg(message = %{id: _id}, from, state)
@@ -197,7 +200,7 @@ defmodule W3WS.RpcBase do
 
       @doc false
       def handle_info({:DOWN, _ref, :process, pid, _reason}, state) do
-        state = W3WS.RpcBase.handle_down_process(pid, &send_msg/2, state)
+        state = W3WS.RpcBase.handle_down_process(pid, &send_msg/3, state)
         {:noreply, state}
       end
 
@@ -232,14 +235,14 @@ defmodule W3WS.RpcBase do
        )
        when is_map_key(pending, id) do
     # original request and sender
-    {from, request} = pending[id]
+    {from = {_type, pid, _ref}, request} = pending[id]
 
     Logger.debug("Received response #{inspect(response)} for request #{inspect(request)}")
 
     state = update_subs(response, request, from, state)
 
     state =
-      if from == self() do
+      if pid == self() do
         # this is a response to an administrative event that we (not a client) sent.
         # ie eth_unsubscribe due to dead process. we don't want to call handle_response 
         # when this module unsubscribed because the subscribed process died.
@@ -273,12 +276,12 @@ defmodule W3WS.RpcBase do
   defp update_subs(
          %{"method" => "eth_subscribe", "result" => subscription},
          _request,
-         {from, _tag},
+         {_type, pid, _ref},
          state
        ) do
-    Logger.debug("tracking subscription #{subscription} for #{inspect(from)}")
-    monitor_ref = Process.monitor(from)
-    RpcState.add_subscription(state, subscription, from, monitor_ref)
+    Logger.debug("tracking subscription #{subscription} for #{inspect(pid)}")
+    monitor_ref = Process.monitor(pid)
+    RpcState.add_subscription(state, subscription, pid, monitor_ref)
   end
 
   defp update_subs(%{"method" => "eth_unsubscribe"}, %{params: [subscription]}, from, state) do
@@ -300,7 +303,7 @@ defmodule W3WS.RpcBase do
     Enum.reduce(subscriptions, state, fn subscription, state ->
       # send these messages from ourself so we can avoid trying to
       # reply to a dead process when the unsubscribe response is received
-      send_msg.(W3WS.Message.eth_unsubscribe(subscription), state)
+      send_msg.(W3WS.Message.eth_unsubscribe(subscription), {:admin, self(), nil}, state)
     end)
   end
 end

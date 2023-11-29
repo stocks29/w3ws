@@ -110,4 +110,52 @@ defmodule W3WS.RpcTest do
     # can still make calls
     assert {:ok, %{"result" => "0x7"}} = Rpc.send_message(rpc, eth_block_number())
   end
+
+  test "can send async messages", %{rpc: rpc} do
+    ref1 = Rpc.async_message(rpc, eth_block_number())
+    ref2 = Rpc.async_message(rpc, eth_block_number())
+
+    assert_receive {:eth_response, ^ref1,
+                    %{
+                      "id" => 1,
+                      "jsonrpc" => "2.0",
+                      "method" => "eth_blockNumber",
+                      "result" => "0x7"
+                    }},
+                   200
+
+    assert_receive {:eth_response, ^ref2,
+                    %{
+                      "id" => 2,
+                      "jsonrpc" => "2.0",
+                      "method" => "eth_blockNumber",
+                      "result" => "0x7"
+                    }},
+                   200
+  end
+
+  test "can mix async and sync calls", %{rpc: rpc} do
+    ref1 = Rpc.async_message(rpc, eth_block_number())
+    {:ok, _res} = Rpc.send_message(rpc, eth_block_number())
+    ref2 = Rpc.async_message(rpc, eth_block_number())
+    {:ok, _res} = Rpc.send_message(rpc, eth_block_number())
+
+    assert_receive {:eth_response, ^ref1,
+                    %{
+                      "id" => 1,
+                      "jsonrpc" => "2.0",
+                      "method" => "eth_blockNumber",
+                      "result" => "0x7"
+                    }},
+                   200
+
+    assert_receive {:eth_response, ^ref2,
+                    %{
+                      "id" => 3,
+                      "jsonrpc" => "2.0",
+                      "method" => "eth_blockNumber",
+                      "result" => "0x7"
+                    }},
+                   200
+  end
 end

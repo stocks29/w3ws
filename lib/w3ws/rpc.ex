@@ -27,6 +27,23 @@ defmodule W3WS.Rpc do
   end
 
   @doc """
+  Send a message to the RPC server and asynchronously receive
+  the response as a message to the calling process.
+
+  ## Examples
+
+      {:ok, receipt} = Rpc.async_message(rpc, eth_block_number())
+      
+      receive do
+        {:eth_response, ^receipt, response} -> IO.inspect(response)
+      end
+  """
+  @spec async_message(rpc(), map()) :: pos_integer()
+  def async_message(rpc, message) do
+    GenServer.call(rpc, {:async, message})
+  end
+
+  @doc """
   Send a message to the RPC server.
 
   This is a synchronous function which returns the response from the JSON-RPC server, 
@@ -43,14 +60,29 @@ defmodule W3WS.Rpc do
   end
 
   @impl GenServer
-  def handle_call({:send, message}, from, state) do
-    state = send_msg(message, from, state)
+  def handle_call({:send, message}, {from, ref}, state) do
+    state = send_msg(message, {:sync, from, ref}, state)
     {:noreply, state}
   end
 
+  # we use references instead of request ids to allow for a single
+  # process to handle responses easily from multiple rpc servers
+  # and to make it easier to handle the state where the rpc server
+  # has not connected to the ws yet.
+  def handle_call({:async, message}, {from, _ref}, state) do
+    ref = make_ref()
+    state = send_msg(message, {:async, from, ref}, state)
+    {:reply, ref, state}
+  end
+
   @impl W3WS.RpcBase
-  def handle_response(response, _request, from, state) do
-    GenServer.reply(from, {:ok, response})
+  def handle_response(response, _request, {:sync, from, ref}, state) do
+    GenServer.reply({from, ref}, {:ok, response})
+    state
+  end
+
+  def handle_response(response, _request, {:async, from, ref}, state) do
+    send(from, {:eth_response, ref, response})
     state
   end
 

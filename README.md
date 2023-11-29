@@ -26,7 +26,7 @@ The package can be installed by adding `w3ws` to your list of dependencies in `m
 ```elixir
 def deps do
   [
-    {:w3ws, "~> 0.1.0"}
+    {:w3ws, "~> 0.2.0"}
   ]
 end
 ```

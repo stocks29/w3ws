@@ -81,8 +81,8 @@ defmodule W3WS.Rpc do
     state
   end
 
-  def handle_response(response, _request, {:async, from, ref}, state) do
-    send(from, {:eth_response, ref, response})
+  def handle_response(response, request, {:async, from, ref}, state) do
+    send(from, {:eth_response, ref, response, request})
     state
   end
 

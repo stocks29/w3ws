@@ -26,21 +26,15 @@ defmodule W3WS.ListenerTest do
     end
 
     subscription =
-      Map.merge(
-        %{
-          handler: handler,
-          abi: @abi
-        },
-        tags[:subscription] || %{}
+      Keyword.merge(
+        [handler: handler, abi: @abi],
+        tags[:subscription] || []
       )
 
     config =
-      Map.merge(
-        %{
-          uri: uri,
-          subscriptions: [subscription]
-        },
-        tags[:config] || %{}
+      Keyword.merge(
+        [uri: uri, subscriptions: [subscription]],
+        tags[:config] || []
       )
 
     {:ok, listener} = Listener.start_link(config)
@@ -107,19 +101,19 @@ defmodule W3WS.ListenerTest do
                    500
   end
 
-  @tag subscription: %{context: %{chain_id: 1}}
+  @tag subscription: [context: %{chain_id: 1}]
   test "includes contents in env" do
     assert_receive {:env, %W3WS.Env{context: %{chain_id: 1}}}, 500
   end
 
-  @tag config: %{resubscribe: 100}
+  @tag config: [resubscribe: 100]
   test "resubscribes on given interval" do
     assert_receive {:env, %W3WS.Env{}}, 1000
     assert_receive {:env, %W3WS.Env{}}, 1000
     assert_receive {:env, %W3WS.Env{}}, 1000
   end
 
-  @tag subscription: %{abi: nil}
+  @tag subscription: [abi: nil]
   test "returns encoded event when no abi to decode" do
     assert_receive {:env,
                     %W3WS.Env{
@@ -133,7 +127,7 @@ defmodule W3WS.ListenerTest do
                    500
   end
 
-  @tag config: %{block_ping: 50}
+  @tag config: [block_ping: 50]
   test "pings for current block when configured", %{listener: listener} do
     :timer.sleep(500)
     assert Listener.get_block(listener) == 7

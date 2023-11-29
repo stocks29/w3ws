@@ -56,15 +56,15 @@ defmodule W3WS.ListenerManagerTest do
       send(test_pid, {:env, env})
     end
 
-    subscription = %{
+    subscription = [
       handler: handler,
       abi: @abi
-    }
+    ]
 
-    config = %{
+    config = [
       uri: uri,
       subscriptions: [subscription]
-    }
+    ]
 
     {:ok, manager} = ListenerManager.start_link(listeners: [config])
     on_exit(fn -> Process.exit(manager, :normal) end)
@@ -80,15 +80,15 @@ defmodule W3WS.ListenerManagerTest do
       send(test_pid, {:env, env})
     end
 
-    subscription = %{
+    subscription = [
       handler: handler,
       abi: @abi
-    }
+    ]
 
-    config = %{
+    config = [
       uri: uri,
       subscriptions: [subscription]
-    }
+    ]
 
     Application.put_env(:test_app, W3WS, listeners: [config, config])
 

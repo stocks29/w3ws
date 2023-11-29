@@ -18,15 +18,15 @@ defmodule W3WS.ListenerManager do
 
   Start a `W3WS.ListenerManager` with one directly configured listener
 
-      {:ok, manager} = W3WS.ListenerManager.start_link(%{
+      {:ok, manager} = W3WS.ListenerManager.start_link(
         listeners: [%{uri: "ws://localhost:8545"}]
-      })
+      )
 
   Start a `W3WS.ListenerManager` with application configuration
 
       # in config/config.exs
       config :my_app, W3WS, listeners: [
-        %{uri: "ws://localhost:8545"}
+        [uri: "ws://localhost:8545"]
       ]
 
       # somewhere in your app
@@ -62,16 +62,16 @@ defmodule W3WS.ListenerManager do
 
   ## Examples
 
-      {:ok, listener} = W3WS.ListenerManager.add_listener(%{
+      {:ok, listener} = W3WS.ListenerManager.add_listener(
         uri: "ws://localhost:8545",
         subscriptions: [
-          %{
+          [
             abi_files: [path_to_abi_file],
      	      handler: MyApp.EventHandler,
             address: "0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266"
-          }
+          ]
      	  ]
-      })
+      )
   """
   @spec add_listener(manager :: pid(), config :: W3WS.Listener.listener_config()) :: {:ok, pid()}
   def add_listener(pid, config) do

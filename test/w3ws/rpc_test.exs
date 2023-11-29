@@ -121,7 +121,7 @@ defmodule W3WS.RpcTest do
                       "jsonrpc" => "2.0",
                       "method" => "eth_blockNumber",
                       "result" => "0x7"
-                    }},
+                    }, _req},
                    200
 
     assert_receive {:eth_response, ^ref2,
@@ -130,7 +130,7 @@ defmodule W3WS.RpcTest do
                       "jsonrpc" => "2.0",
                       "method" => "eth_blockNumber",
                       "result" => "0x7"
-                    }},
+                    }, _req},
                    200
   end
 
@@ -146,7 +146,7 @@ defmodule W3WS.RpcTest do
                       "jsonrpc" => "2.0",
                       "method" => "eth_blockNumber",
                       "result" => "0x7"
-                    }},
+                    }, _req},
                    200
 
     assert_receive {:eth_response, ^ref2,
@@ -155,7 +155,7 @@ defmodule W3WS.RpcTest do
                       "jsonrpc" => "2.0",
                       "method" => "eth_blockNumber",
                       "result" => "0x7"
-                    }},
+                    }, _req},
                    200
   end
 end

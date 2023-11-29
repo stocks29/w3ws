@@ -12,8 +12,12 @@ defmodule W3WS.Util do
 
       iex> to_hex(<<1, 2, 3>>)
       "0x010203"
+
+      iex> to_hex(1)
+      "0x1"
   """
-  @spec to_hex(binary()) :: String.t()
+  @spec to_hex(binary() | integer()) :: String.t()
+  def to_hex(int) when is_integer(int), do: "0x" <> Integer.to_string(int, 16)
   def to_hex(binary), do: "0x" <> Base.encode16(binary, case: :lower)
 
   @doc """

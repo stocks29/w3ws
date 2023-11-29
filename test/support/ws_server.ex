@@ -9,7 +9,7 @@ defmodule W3WS.WsServer do
 
       {:text, data} ->
         data = Jason.decode!(data)
-        Logger.debug("[server] Received data: #{inspect(data)}")
+        Logger.debug("[server] received data: #{inspect(data)}")
 
         case data do
           %{"method" => "eth_blockNumber"} ->
@@ -126,9 +126,9 @@ defmodule W3WS.WsServer do
   end
 
   defp ws_loop(server) do
-    Logger.debug("Waiting for client connection")
+    Logger.debug("waiting for client connection")
     client = Socket.Web.accept!(server)
-    Logger.debug("Accepted client connection")
+    Logger.debug("accepted client connection")
     # have to accept twice to actually accept the connection
     Socket.Web.accept!(client)
     spawn(fn -> client_handler(client) end)
@@ -138,7 +138,7 @@ defmodule W3WS.WsServer do
   def start(port) do
     spawn(fn ->
       server = Socket.Web.listen!(port)
-      Logger.debug("Listening on port #{port}")
+      Logger.debug("listening on port #{port}")
       ws_loop(server)
     end)
   end

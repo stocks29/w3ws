@@ -148,7 +148,7 @@ defmodule W3WS.RpcBase do
 
         case queued do
           [] -> :ok
-          [_ | _] -> Logger.debug("Sending queued requests")
+          [_ | _] -> Logger.debug("sending queued requests")
         end
 
         state =
@@ -170,7 +170,7 @@ defmodule W3WS.RpcBase do
       # not yet connected, so queue the message
       defp send_msg(message = %{id: _id}, from, state)
            when not is_map_key(state, :base_rpc) or not state.base_rpc.connected? do
-        Logger.debug("Queuing request")
+        Logger.debug("queuing request")
         RpcState.add_queued(state, {from, message})
       end
 
@@ -179,7 +179,7 @@ defmodule W3WS.RpcBase do
         {id, state} = RpcState.next_id(state)
         message = Message.set_id(message, id)
         state = RpcState.add_pending(state, message, from)
-        Logger.debug("Sending request\n #{inspect(message)}")
+        Logger.debug("sending request #{inspect(message)}")
 
         message
         |> Message.encode!()
@@ -237,7 +237,7 @@ defmodule W3WS.RpcBase do
     # original request and sender
     {from = {_type, pid, _ref}, request} = pending[id]
 
-    Logger.debug("Received response #{inspect(response)} for request #{inspect(request)}")
+    Logger.debug("received response #{inspect(response)} for request #{inspect(request)}")
 
     state = update_subs(response, request, from, state)
 
@@ -267,7 +267,7 @@ defmodule W3WS.RpcBase do
     {from, _monitor_ref} = RpcState.get_subscription(state, subscription)
     module.handle_subscription(response, from, state)
 
-    Logger.debug("Received subscription #{inspect(response)}")
+    Logger.debug("received subscription #{inspect(response)}")
     state
   end
 

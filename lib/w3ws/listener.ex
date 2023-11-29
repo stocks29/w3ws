@@ -321,7 +321,7 @@ defmodule W3WS.Listener do
          ref,
          state
        ) do
-    Logger.debug("Created subscription: #{sub_id}")
+    Logger.debug("created subscription: #{sub_id}")
 
     State.update_subscriptions(state, fn subscription ->
       case subscription[:subscribe_ref] do
@@ -338,7 +338,7 @@ defmodule W3WS.Listener do
          _ref,
          state
        ) do
-    Logger.debug("Destroyed subscription: #{sub_id}")
+    Logger.debug("destroyed subscription: #{sub_id}")
     state
   end
 
@@ -348,7 +348,7 @@ defmodule W3WS.Listener do
          _ref,
          state
        ) do
-    Logger.warning("Failed to destory subscription: #{sub_id}")
+    Logger.warning("failed to destory subscription: #{sub_id}")
     state
   end
 end

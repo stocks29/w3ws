@@ -61,6 +61,6 @@ defmodule W3WS.Handler.DefaultHandler do
   """
   @impl W3WS.Handler
   def handle_event(%Env{} = env) do
-    Logger.info("Received event: #{inspect(env)}")
+    Logger.info("received event: #{inspect(env)}")
   end
 end

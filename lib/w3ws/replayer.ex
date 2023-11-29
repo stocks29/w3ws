@@ -151,7 +151,7 @@ defmodule W3WS.Replayer do
 
       tasks =
         Enum.map(replays || [], fn replay ->
-          Logger.debug("Starting replay #{inspect(replay)}")
+          Logger.debug("starting replay #{inspect(replay)}")
 
           replay =
             args
@@ -161,10 +161,10 @@ defmodule W3WS.Replayer do
           Task.async(W3WS.Replayer.ReplayerTask, :run, [replay])
         end)
 
-      Logger.debug("Waiting for replays to complete")
+      Logger.debug("waiting for replays to complete")
       Task.await_many(tasks, :infinity)
       W3WS.Rpc.stop(rpc)
-      Logger.debug("Replays complete")
+      Logger.debug("replays complete")
 
       :ok
     end
@@ -207,7 +207,14 @@ defmodule W3WS.Replayer do
       chunk_sleep = Keyword.get(args, :chunk_sleep, 10_000)
       abi = W3WS.Util.resolve_abi(args)
 
-      base_args = Keyword.take(args, [:topics, :address])
+      topics =
+        Keyword.get(args, :topics, [])
+        |> W3WS.ABI.encode_topics(abi)
+
+      base_args =
+        args
+        |> Keyword.take([:address])
+        |> Keyword.put(:topics, topics)
 
       # Do the replay
       from_block..to_block//chunk_size
@@ -216,8 +223,8 @@ defmodule W3WS.Replayer do
       |> Enum.each(fn [start_block, end_block] ->
         args =
           Keyword.merge(base_args,
-            from_block: start_block,
-            to_block: end_block
+            from_block: W3WS.Util.to_hex(start_block),
+            to_block: W3WS.Util.to_hex(end_block)
           )
 
         do_replay(rpc, args, handler, abi, context)

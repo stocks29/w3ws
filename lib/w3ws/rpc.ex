@@ -2,7 +2,7 @@ defmodule W3WS.Rpc do
   @moduledoc """
   W3WS RPC Server
 
-  This is useful for making arbitary requests to the JSON-RPC server over a 
+  This is useful for making arbitrary requests to the JSON-RPC server over a 
   websocket. This module ignores the `id` field (if any) in given message as
   it maintains it's own sequence.
   """
@@ -32,10 +32,10 @@ defmodule W3WS.Rpc do
 
   ## Examples
 
-      {:ok, receipt} = Rpc.async_message(rpc, eth_block_number())
+      receipt = Rpc.async_message(rpc, eth_block_number())
       
       receive do
-        {:eth_response, ^receipt, response} -> IO.inspect(response)
+        {:eth_response, ^receipt, response, _request} -> IO.inspect(response)
       end
   """
   @spec async_message(rpc(), map()) :: pos_integer()

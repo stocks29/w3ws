@@ -63,6 +63,7 @@ defmodule W3WS.ListenerManager do
   ## Examples
 
       {:ok, listener} = W3WS.ListenerManager.add_listener(
+        manager,
         uri: "ws://localhost:8545",
         subscriptions: [
           [

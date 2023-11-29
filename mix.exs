@@ -11,6 +11,11 @@ defmodule W3Events.MixProject do
       aliases: aliases(),
       package: package(),
       description: description(),
+      docs: [
+        main: "readme",
+        logo: "./logo.jpg",
+        extras: ["README.md"]
+      ],
       deps: deps()
     ]
   end

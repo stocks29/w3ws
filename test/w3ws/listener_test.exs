@@ -101,6 +101,29 @@ defmodule W3WS.ListenerTest do
                    500
   end
 
+  test "passes removed events to handler" do
+    assert_receive {:env,
+                    %W3WS.Env{
+                      event: %W3WS.Event{
+                        removed: true,
+                        transaction_hash:
+                          "0xe776901f5d4049c63f3d464ee60162dd2a1f5c8d949e402e6b9f1d87705b9999",
+                        transaction_index: 0
+                      },
+                      jsonrpc: "2.0",
+                      method: "eth_subscription",
+                      raw: %W3WS.RawEvent{
+                        transaction_hash:
+                          "0xe776901f5d4049c63f3d464ee60162dd2a1f5c8d949e402e6b9f1d87705b9999",
+                        transaction_index: "0x0"
+                      },
+                      subscription: "0x9"
+                    }},
+                   500
+  end
+
+  @tag subscription: [context: %{chain_id: 1}]
+
   @tag subscription: [context: %{chain_id: 1}]
   test "includes contents in env" do
     assert_receive {:env, %W3WS.Env{context: %{chain_id: 1}}}, 500

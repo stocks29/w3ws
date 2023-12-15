@@ -25,7 +25,7 @@ defmodule W3WS.ReplayerTest do
     )
 
     events = get_events.()
-    assert length(events) == 2
+    assert length(events) == 6
   end
 
   test "decodes events when ABI present", %{uri: uri, handler: handler, get_events: get_events} do
@@ -63,6 +63,7 @@ defmodule W3WS.ReplayerTest do
 
   defp setup_handler(_tags) do
     {:ok, agent} = Agent.start_link(fn -> [] end)
+    on_exit(fn -> Process.exit(agent, :normal) end)
 
     handler = fn env ->
       Agent.update(agent, fn events -> [env | events] end)

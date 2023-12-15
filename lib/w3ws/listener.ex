@@ -175,6 +175,18 @@ defmodule W3WS.Listener do
   def init(config) do
     {:ok, rpc} = W3WS.Rpc.start_link(uri: config[:uri])
 
+    # initialize handlers if necessary
+    subscriptions =
+      Enum.map(config[:subscriptions] || [], fn subscription ->
+        {:ok, handler, handler_state} =
+          Keyword.get(subscription, :handler)
+          |> W3WS.Handler.initialize(rpc: rpc)
+
+        Keyword.merge(subscription, handler: handler, handler_state: handler_state)
+      end)
+
+    config = Keyword.put(config, :subscriptions, subscriptions)
+
     state =
       State.new(config, rpc)
       |> subscribe_subscriptions()
@@ -291,7 +303,7 @@ defmodule W3WS.Listener do
 
     message
     |> W3WS.Env.from_eth_subscription(context)
-    |> W3WS.Util.decode_apply(sub[:abi], sub[:handler])
+    |> W3WS.Util.decode_apply(sub[:abi], sub[:handler], sub[:handler_state])
 
     {:noreply, state}
   end

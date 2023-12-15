@@ -71,41 +71,6 @@ defmodule W3WS.Util do
   end
 
   @doc """
-  Call the handler with the given event
-
-  ## Examples
-
-      iex> apply_handler(%W3WS.Env{}, fn _env -> :ok end) |> is_pid()
-      true
-
-      iex> apply_handler(%W3WS.Env{}, W3WS.Handler.DefaultHandler) |> is_pid()
-      true
-
-      iex> apply_handler(%W3WS.Env{}, {W3WS.Handler.DefaultHandler, :handle, []}) |> is_pid()
-      true
-
-      iex> apply_handler(%W3WS.Env{}, "something")
-      ** (RuntimeError) Invalid handler: "something"
-  """
-  @spec apply_handler(
-          env :: W3WS.Env.t(),
-          handler :: W3WS.Handler.t()
-        ) :: pid() | {pid(), reference()}
-
-  # we spawn processes (and don't link) so handler errors do not take down the caller process
-  def apply_handler(env, {m, f, a}), do: Process.spawn(m, f, [env | a], [])
-
-  def apply_handler(env, handler) when is_atom(handler),
-    do: Process.spawn(handler, :handle, [env], [])
-
-  def apply_handler(env, fun) when is_function(fun),
-    do: Process.spawn(fn -> fun.(env) end, [])
-
-  def apply_handler(_env, handler) do
-    raise "Invalid handler: #{inspect(handler)}"
-  end
-
-  @doc """
   Try to decode an event if an ABI is present
   """
   @spec maybe_decode_event(W3WS.Env.t(), W3WS.ABI.t() | nil) :: W3WS.Env.t()
@@ -132,12 +97,12 @@ defmodule W3WS.Util do
   The handler is always called, even if the event could not be 
   decoded.
   """
-  @spec decode_apply(W3WS.Env.t(), W3WS.ABI.t() | nil, W3WS.Handler.t()) ::
+  @spec decode_apply(W3WS.Env.t(), W3WS.ABI.t() | nil, W3WS.Handler.t(), any()) ::
           pid() | {pid(), reference()}
-  def decode_apply(env, abi, handler) do
+  def decode_apply(env, abi, handler, handler_state) do
     env
     |> maybe_decode_event(abi)
-    |> apply_handler(handler)
+    |> W3WS.Handler.apply_handler(handler, handler_state)
   end
 
   @doc """

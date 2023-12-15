@@ -44,6 +44,7 @@ defmodule W3WS.RpcTest do
              "0xe776901f5d4049c63f3d464ee60162dd2a1f5c8d949e402e6b9f1d87705b2861",
            "transactionIndex" => "0x0"
          }
+         | _
        ]
      }} = Rpc.send_message(rpc, eth_get_logs([]))
   end
@@ -86,6 +87,7 @@ defmodule W3WS.RpcTest do
                     "0xe776901f5d4049c63f3d464ee60162dd2a1f5c8d949e402e6b9f1d87705b2861",
                   "transactionIndex" => "0x0"
                 }
+                | _
               ]
             }} = result2
 

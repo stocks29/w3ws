@@ -1,9 +1,11 @@
 defmodule W3WS.Replayer do
   @moduledoc """
-  W3WS Replayer is a `Task` that executes each replay in parallel. Each
-  replay fetches the logs, decodes if possible, and calls the handler with
-  each event. Each replay iterates from the `from_block` to the `to_block`
-  using `chunk_size` number of blocks. When the replayer has reached the
+  A `Task` that replays past events.
+
+  `W3WS.Replayer` executes each replay in parallel. Each replay fetches 
+  the logs, decodes if possible, and calls the handler with each event. 
+  Each replay iterates from the `from_block` to the `to_block` using 
+  `chunk_size` number of blocks. When the replayer has reached the 
   `to_block` it will stop and shutdown.
 
   If an ABI is provided and the event has a matching selector in the ABI
@@ -207,6 +209,8 @@ defmodule W3WS.Replayer do
       chunk_sleep = Keyword.get(args, :chunk_sleep, 10_000)
       abi = W3WS.Util.resolve_abi(args)
 
+      {:ok, handler, handler_state} = W3WS.Handler.initialize(handler, rpc: rpc)
+
       topics =
         Keyword.get(args, :topics, [])
         |> W3WS.ABI.encode_topics(abi)
@@ -227,22 +231,35 @@ defmodule W3WS.Replayer do
             to_block: W3WS.Util.to_hex(end_block)
           )
 
-        do_replay(rpc, args, handler, abi, context)
+        do_replay(rpc, args, handler, handler_state, abi, context)
 
         if end_block < to_block and chunk_sleep > 0 do
           Process.sleep(chunk_sleep)
         end
       end)
+
+      wait_until_handler_settled(handler, handler_state)
+    end
+
+    defp wait_until_handler_settled(handler, state) do
+      if W3WS.Handler.settled?(handler, state) do
+        :ok
+      else
+        Logger.debug("waiting for handler to settle")
+        Process.sleep(1_000)
+        wait_until_handler_settled(handler, state)
+      end
     end
 
     @spec do_replay(
             rpc :: W3WS.Rpc.t(),
             args :: W3WS.Replayer.replay_args(),
             handler :: W3WS.Handler.t(),
+            handler_state :: any(),
             abi :: list(%ABI.FunctionSelector{}) | nil,
             context :: map()
           ) :: :ok
-    defp do_replay(rpc, args, handler, abi, context) do
+    defp do_replay(rpc, args, handler, handler_state, abi, context) do
       # get the logs
       {:ok, %{"result" => logs}} = W3WS.Rpc.send_message(rpc, eth_get_logs(args))
 
@@ -250,7 +267,7 @@ defmodule W3WS.Replayer do
       Enum.each(logs, fn log ->
         log
         |> W3WS.Env.from_log(context)
-        |> W3WS.Util.decode_apply(abi, handler)
+        |> W3WS.Util.decode_apply(abi, handler, handler_state)
       end)
     end
 

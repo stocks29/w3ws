@@ -76,11 +76,14 @@ config :my_app, W3WS, listeners: [
         context: %{chain_id: 1},
 
         # handler to call for each received event. can be either a module which `use`s 
-        # `W3WS.Handler` and defines a `handle_event/1` function, an anonymous function
-        # which accepts a `%W3WS.Env{}` struct, or an MFA tuple. In the MFA tuple case
-        # the arguments will be a `%W3WS.Env{}` struct followed by any arguments provided.
+        # `W3WS.Handler` and defines a `c:W3WS.Handler.handle_event/2` function, an 
+        # anonymous function which accepts a `%W3WS.Env{}` struct, or an MFA tuple. 
+        # In the MFA tuple case  the arguments will be a `%W3WS.Env{}` struct followed
+        # by any arguments provided.
         # defaults to `W3WS.Handler.DefaultHandler` which logs received events.
-        handler: MyApp.Handler,
+        handler: {W3WS.Handler.BlockRemovalHandler,
+                    blocks: 12,
+                    handler: MyApp.Handler},
 
         # a list of log event topics to subscribe to for the given subscription. this is
         # optional. not passing `:topics` will subscribe to all log events. See
@@ -174,7 +177,9 @@ defmodule MyApp.Handler do
         %Env{
             decoded?: true, 
             event: %Event{name: "Transfer", data: %{"from" => from}}
-        }) do
+        },
+        _state
+    ) do
     Logger.debug("received Transfer event from #{from}")
   end
 end
@@ -186,6 +191,13 @@ properly handles errors or queues event processing into a resilient framework. T
 listener does not wait on the handler to complete. If serial processing of events is 
 important to you, you will need to handle this yourself. The return value from the 
 handler is ignored.
+
+#### Removed Events
+
+There are a few composable handlers included which can be used to filter out removed events:
+
+- `W3WS.Handler.TimedRemovalHandler`
+- `W3WS.Handler.BlockRemovalHandler`
 
 ### RPC Calls
 

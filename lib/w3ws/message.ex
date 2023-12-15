@@ -76,6 +76,15 @@ defmodule W3WS.Message do
   end
 
   @doc """
+  Create an `eth_subscribe` request for "newHeads".
+
+  This is a convenience function and not part of the JSON-RPC spec.
+  """
+  def eth_subscribe_new_heads(opts \\ []) do
+    eth_subscribe([:newHeads], opts)
+  end
+
+  @doc """
   Create an `eth_unsubscribe` request.
 
   Takes a `subscription` argument which will be used as the subscription 

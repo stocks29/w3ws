@@ -192,6 +192,13 @@ listener does not wait on the handler to complete. If serial processing of event
 important to you, you will need to handle this yourself. The return value from the 
 handler is ignored.
 
+#### Removed Events
+
+There are a few composable handlers included which can be used to filter out removed events:
+
+- `W3WS.Handler.TimedRemovalHandler`
+- `W3WS.Handler.BlockRemovalHandler`
+
 ### RPC Calls
 
 It is also possible to use the underlying `W3WS.Rpc` API directly. This is a lower-level library

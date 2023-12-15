@@ -85,7 +85,7 @@ defmodule W3WS.Handler.GenServerHandler do
       # rpc process went down so terminate this process
       @impl GenServer
       def handle_info({:DOWN, _ref, :process, rpc, reason}, state = %{rpc: rpc}) do
-        Logger.info("handler stopping: rpc process went down with reason: #{inspect(reason)}")
+        Logger.debug("handler stopping: rpc process went down with reason: #{inspect(reason)}")
         {:stop, :normal, state}
       end
 

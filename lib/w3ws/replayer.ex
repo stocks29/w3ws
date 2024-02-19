@@ -242,6 +242,9 @@ defmodule W3WS.Replayer do
     end
 
     defp wait_until_handler_settled(handler, state) do
+      # give handlers a moment to receive events and update their settled state.
+      Process.sleep(10)
+
       if W3WS.Handler.settled?(handler, state) do
         :ok
       else

@@ -155,6 +155,30 @@ defmodule W3WS.Handler.TimedRemovalHandlerTest do
     setup :setup_rpc
     setup :setup_handler
 
+    test "emits events with chunk_size larger than number of blocks", %{
+      uri: uri,
+      handler: handler,
+      get_events: get_events
+    } do
+      Replayer.replay(
+        uri: uri,
+        from_block: 1,
+        chunk_size: 100,
+        chunk_sleep: :timer.seconds(3),
+        replays: [
+          [handler: handler]
+        ]
+      )
+
+      # wait for delayed events to be sent
+      :timer.sleep(5000)
+
+      events = get_events.()
+      # 1 because getLogs will only be called once because
+      # chunk_size is greater than available blocks
+      assert length(events) == 1
+    end
+
     test "drops removed events", %{uri: uri, handler: handler, get_events: get_events} do
       Replayer.replay(
         uri: uri,
@@ -170,6 +194,8 @@ defmodule W3WS.Handler.TimedRemovalHandlerTest do
       :timer.sleep(1500)
 
       events = get_events.()
+      # 2 because getLogs will be called twice due to
+      # chunk size being smaller than available blocks
       assert length(events) == 2
       refute Enum.any?(events, fn env -> env.event.removed end)
 

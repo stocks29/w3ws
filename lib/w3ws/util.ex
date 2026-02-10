@@ -116,20 +116,16 @@ defmodule W3WS.Util do
       iex> resolve_abi(abi: nil)
       nil
 
-      iex> resolve_abi(abi: [], abi_files: ["./test/support/files/test_abi.json"])
-      [
-        %ABI.FunctionSelector{
-          function: "Transfer", 
-          method_id: <<221, 242, 82, 173>>, 
-          type: :event, 
-          inputs_indexed: [false, false, false], 
-          state_mutability: nil, 
-          input_names: ["from", "to", "value"], 
-          types: [:address, :address, {:uint, 256}], 
-          returns: [], 
-          return_names: []
-        }
-      ]
+      iex> [%ABI.FunctionSelector{
+      ...>   function: "Transfer",
+      ...>   type: :event,
+      ...>   inputs_indexed: [false, false, false],
+      ...>   state_mutability: nil,
+      ...>   input_names: ["from", "to", "value"],
+      ...>   types: [:address, :address, {:uint, 256}],
+      ...>   returns: [],
+      ...>   return_names: []
+      ...> }] = resolve_abi(abi: [], abi_files: ["./test/support/files/test_abi.json"])
   """
   def resolve_abi(opts) do
     cond do

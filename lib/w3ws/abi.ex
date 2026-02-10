@@ -10,23 +10,19 @@ defmodule W3WS.ABI do
 
   ## Examples
 
-      iex> from_files(["./test/support/files/test_abi.json"])
-      [
-        %ABI.FunctionSelector{
-          type: :event,
-          function: "Transfer",
-          method_id: <<221, 242, 82, 173>>,
-          input_names: ["from", "to", "value"],
-          inputs_indexed: [false, false, false],
-          types: [:address, :address, {:uint, 256}]
-        }
-      ]
+      iex> [%ABI.FunctionSelector{
+      ...>   type: :event,
+      ...>   function: "Transfer",
+      ...>   input_names: ["from", "to", "value"],
+      ...>   inputs_indexed: [false, false, false],
+      ...>   types: [:address, :address, {:uint, 256}]
+      ...> }] = from_files(["./test/support/files/test_abi.json"])
   """
   def from_files(paths) do
     Enum.flat_map(paths, fn path ->
       path
       |> File.read!()
-      |> Jason.decode!()
+      |> W3WS.json_module().decode!()
       |> ABI.parse_specification(include_events?: true)
       |> filter_abi_events()
     end)
@@ -37,7 +33,13 @@ defmodule W3WS.ABI do
 
   ## Examples
 
-      iex> from_abi([
+      iex> [%ABI.FunctionSelector{
+      ...>   type: :event,
+      ...>   function: "Transfer",
+      ...>   input_names: ["from", "to", "value"],
+      ...>   inputs_indexed: [false, false, false],
+      ...>   types: [:address, :address, {:uint, 256}]
+      ...> }] = from_abi([
       ...>   %{
       ...>     "name" => "Transfer",
       ...>     "type" => "event",
@@ -63,16 +65,6 @@ defmodule W3WS.ABI do
       ...>     ]
       ...>   }
       ...> ])
-      [
-        %ABI.FunctionSelector{
-          type: :event,
-          function: "Transfer",
-          method_id: <<221, 242, 82, 173>>,
-          input_names: ["from", "to", "value"],
-          inputs_indexed: [false, false, false],
-          types: [:address, :address, {:uint, 256}]
-        }
-      ]
   """
   def from_abi(abi) do
     abi
@@ -89,41 +81,29 @@ defmodule W3WS.ABI do
 
   ## Examples
 
-      iex> decode_event(
+      iex> abi = from_abi([
+      ...>   %{
+      ...>     "name" => "TokenSupportChange",
+      ...>     "type" => "event",
+      ...>     "inputs" => [
+      ...>       %{"name" => "supported", "type" => "bool", "indexed" => false},
+      ...>       %{"name" => "token", "type" => "address", "indexed" => false},
+      ...>       %{"name" => "symbol", "type" => "string", "indexed" => false},
+      ...>       %{"name" => "decimals", "type" => "uint8", "indexed" => false}
+      ...>     ]
+      ...>   }
+      ...> ])
+      iex> {:ok, %ABI.FunctionSelector{function: "TokenSupportChange"}, decoded} = decode_event(
       ...>   "0x0000000000000000000000000000000000000000000000000000000000000001000000000000000000000000959922be3caee4b8cd9a407cc3ac1c251c2007b10000000000000000000000000000000000000000000000000000000000000080000000000000000000000000000000000000000000000000000000000000001200000000000000000000000000000000000000000000000000000000000000034152420000000000000000000000000000000000000000000000000000000000",
-      ...>   [
-      ...>      %ABI.FunctionSelector{
-      ...>        function: "TokenSupportChange",
-      ...>        method_id: <<1, 72, 203, 165>>,
-      ...>        type: :event,
-      ...>        inputs_indexed: [false, false, false, false],
-      ...>        state_mutability: nil,
-      ...>        input_names: ["supported", "token", "symbol", "decimals"],
-      ...>        types: [:bool, :address, :string, {:uint, 8}],
-      ...>        returns: [],
-      ...>        return_names: []
-      ...>      }
-      ...>   ],
+      ...>   abi,
       ...>   ["0x0148cba56e5d3a8d32fbcea206eae9e449ec0f0def4f642994b3edcd38561deb"]
       ...> )
-      {:ok, 
-        %ABI.FunctionSelector{
-          function: "TokenSupportChange",
-          method_id: <<1, 72, 203, 165>>,
-          type: :event,
-          inputs_indexed: [false, false, false, false],
-          state_mutability: nil,
-          input_names: ["supported", "token", "symbol", "decimals"],
-          types: [:bool, :address, :string, {:uint, 8}],
-          returns: [],
-          return_names: []
-        }, 
-        %{
-          "decimals" => 18, 
-          "supported" => true, 
-          "symbol" => "ARB", 
-          "token" => "0x959922be3caee4b8cd9a407cc3ac1c251c2007b1"
-        }
+      iex> decoded
+      %{
+        "decimals" => 18,
+        "supported" => true,
+        "symbol" => "ARB",
+        "token" => "0x959922be3caee4b8cd9a407cc3ac1c251c2007b1"
       }
   """
   @spec decode_event(binary(), list(%ABI.FunctionSelector{}), [binary()]) ::

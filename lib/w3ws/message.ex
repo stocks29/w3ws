@@ -102,12 +102,12 @@ defmodule W3WS.Message do
   @doc """
   Encode the message as json
   """
-  def encode!(message), do: Jason.encode!(message)
+  def encode!(message), do: W3WS.json_module().encode!(message)
 
   @doc """
   Dencode the message from json
   """
-  def decode!(message), do: Jason.decode!(message)
+  def decode!(message), do: W3WS.json_module().decode!(message)
 
   defp id(opts), do: Keyword.get(opts, :id, 1)
 

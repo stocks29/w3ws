@@ -220,7 +220,7 @@ defmodule W3WS.RpcBase do
   def handle_frame({:text, message}, state, module) do
     state =
       message
-      |> Jason.decode!()
+      |> W3WS.json_module().decode!()
       |> handle_decoded_frame(state, module)
 
     {:noreply, state}

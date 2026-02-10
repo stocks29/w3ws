@@ -35,6 +35,16 @@ end
 
 Documentation can be found at <https://hexdocs.pm/w3ws>.
 
+### JSON Module
+
+W3WS uses `Jason` by default. You can override the JSON implementation with:
+
+```elixir
+config :w3ws, json_module: Jason
+```
+
+The configured module must provide `encode!/1` and `decode!/1`.
+
 ### Event Listener
 
 Configure the listeners for your application:
@@ -259,4 +269,3 @@ See the [documentation](https://hexdocs.pm/w3ws) for additional usage.
   inclusion here please open an issue.
 - This library is under active development and is subject to change without notice.
   - Semantic versioning will not be followed until the library is stable.
-
